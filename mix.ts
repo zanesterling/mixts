@@ -62,6 +62,21 @@ class State {
 
 /** Instructions **/
 
+class OpCode {
+    readonly opCode: number;
+    readonly symbName: string;
+    readonly normalF: Byte;
+    readonly showArg: boolean;
+
+    constructor(opCode: number, symbName: string, normalF: Byte, showArg: boolean = true) {
+        this.opCode = opCode;
+        this.symbName = symbName;
+        this.normalF = normalF;
+        this.showArg = showArg;
+    }
+}
+
+
 export class Instruction {
     readonly AA: Index;
     readonly I: Byte;
@@ -81,16 +96,21 @@ export class Instruction {
     }
 
     toText(): string {
-        const opCode = "LDA";
-        const index = this.I === 0 ? "" : "," + this.I;
-        let fieldSpec = "";
-        if (this.F !== 5) { // TODO: Actually check if F is normal.
-            // TODO: Special-case the I/O instructions.
-            const left = this.F >> 3
-            const right = this.F % 8;
-            fieldSpec = `(${left}:${right})`;
+        if (this.C < 0 || this.C > 63) {
+            throw Error(`bad byte: instr.C: ${this.C}`);
         }
-        return `${opCode}  ${indexToString(this.AA)}${index}${fieldSpec}`
+        const opCode = Instruction.opCode(this.C, this.F);
+        const symbName = opCode.symbName;
+        const index = this.I === 0 ? "" : "," + this.I;
+        let AA = opCode.showArg ? indexToString(this.AA) : "";
+        let fieldSpec = "";
+        if (this.F !== opCode.normalF) {
+            // TODO: Special-case the I/O instructions.
+            fieldSpec = `(${this.F >> 3}:${this.F % 8})`;
+        }
+        const suffix = `${AA}${index}${fieldSpec}`;
+        if (suffix === "") return symbName;
+        return `${symbName}  ${suffix}`
     }
 
     static fromText(str: string): Instruction {
@@ -101,8 +121,134 @@ export class Instruction {
         return new Instruction(...word);
     }
 
-    static opCodes = [];
+    static opCodes: Array<OpCode | ((F: Byte) => OpCode)> = [
+        new OpCode(0, "NOP", 0, false),
+        (F: Byte) => F === 6 ? new OpCode(1, "FADD", 6)
+                             : new OpCode(1, "ADD", 5),
+        (F: Byte) => F === 6 ? new OpCode(2, "FSUB", 6)
+                             : new OpCode(2, "SUB", 5),
+        (F: Byte) => F === 6 ? new OpCode(3, "FMUL", 6)
+                             : new OpCode(3, "MUL", 5),
+        (F: Byte) => F === 6 ? new OpCode(4, "FDIV", 6)
+                             : new OpCode(4, "DIV", 5),
+        Cases(5, new Map([
+            [0, new OpCode(5, "NUM", 0)],
+            [1, new OpCode(5, "CHAR", 1)],
+            [2, new OpCode(5, "HLT", 2)],
+        ])),
+        Cases(6, new Map([
+            [0, new OpCode(6, "SLA", 0)],
+            [1, new OpCode(6, "SRA", 1)],
+            [2, new OpCode(6, "SLAX", 2)],
+            [3, new OpCode(6, "SRAX", 3)],
+            [4, new OpCode(6, "SLC", 4)],
+            [5, new OpCode(6, "SRC", 5)],
+        ])),
+        Cases(7, new Map([[1, new OpCode(7, "MOVE", 1)]])),
+        new OpCode(8,  "LDA", 5),
+        new OpCode(9,  "LD1", 5),
+        new OpCode(10, "LD2", 5),
+        new OpCode(11, "LD3", 5),
+        new OpCode(12, "LD4", 5),
+        new OpCode(13, "LD5", 5),
+        new OpCode(14, "LD6", 5),
+        new OpCode(15, "LDX", 5),
+        new OpCode(16, "LDAN", 5),
+        new OpCode(17, "LD1N", 5),
+        new OpCode(18, "LD2N", 5),
+        new OpCode(19, "LD3N", 5),
+        new OpCode(20, "LD4N", 5),
+        new OpCode(21, "LD5N", 5),
+        new OpCode(22, "LD6N", 5),
+        new OpCode(23, "LDXN", 5),
+        new OpCode(24, "STA", 5),
+        new OpCode(25, "ST1", 5),
+        new OpCode(26, "ST2", 5),
+        new OpCode(27, "ST3", 5),
+        new OpCode(28, "ST4", 5),
+        new OpCode(29, "ST5", 5),
+        new OpCode(30, "ST6", 5),
+        new OpCode(31, "STX", 5),
+        new OpCode(32, "STJ", 2),
+        new OpCode(33, "STZ", 5),
+        Cases(34, new Map([[0, new OpCode(34, "JBUS", 0)]])),
+        Cases(35, new Map([[0, new OpCode(35, "IOC", 0)]])),
+        Cases(36, new Map([[0, new OpCode(36, "IN", 0)]])),
+        Cases(37, new Map([[0, new OpCode(37, "OUT", 0)]])),
+        Cases(38, new Map([[0, new OpCode(38, "JRED", 0)]])),
+        Cases(39, new Map([
+            [0, new OpCode(39, "JMP", 0)],
+            [1, new OpCode(39, "JSJ", 1)],
+            [2, new OpCode(39, "JOV", 2)],
+            [3, new OpCode(39, "JNOV", 3)],
+            [4, new OpCode(39, "JL", 4)],
+            [5, new OpCode(39, "JE", 5)],
+            [6, new OpCode(39, "JG", 6)],
+            [7, new OpCode(39, "JGE", 7)],
+            [8, new OpCode(39, "JNE", 8)],
+            [9, new OpCode(39, "JLE", 9)],
+        ])),
+        JReg(40, "JA"),
+        JReg(41, "J1"),
+        JReg(42, "J2"),
+        JReg(43, "J3"),
+        JReg(44, "J4"),
+        JReg(45, "J5"),
+        JReg(46, "J6"),
+        JReg(47, "JX"),
+        IncReg(48, "A"),
+        IncReg(49, "1"),
+        IncReg(50, "2"),
+        IncReg(51, "3"),
+        IncReg(52, "4"),
+        IncReg(53, "5"),
+        IncReg(54, "6"),
+        IncReg(55, "X"),
+        (F: Byte) => F === 6 ? new OpCode(56, "FCMP", 6)
+                             : new OpCode(56, "CMPA", 5),
+        new OpCode(57, "CMP1", 5),
+        new OpCode(58, "CMP2", 5),
+        new OpCode(59, "CMP3", 5),
+        new OpCode(60, "CMP4", 5),
+        new OpCode(61, "CMP5", 5),
+        new OpCode(62, "CMP6", 5),
+        new OpCode(63, "CMPX", 5),
+    ];
+    static opCode(C: Byte, F: Byte) {
+        const x = Instruction.opCodes[C];
+        if (!x) throw new Error(`bad opcode: C=${C}, F=${F}`)
+        if (x instanceof OpCode) return x;
+        return x(F);
+    }
 }
+
+function Cases(opCode: number, codes: Map<number, OpCode>): ((F: Byte) => OpCode) {
+    return (F: Byte) => {
+        if (codes.has(F)) return codes.get(F)!;
+        throw new Error(`bad opcode: C=${opCode}, F=${F}`);
+    };
+}
+function JReg(opCode: number, symb: string) {
+    return Cases(opCode, new Map([
+        [0, new OpCode(opCode, `${symb}N`, 0)],
+        [1, new OpCode(opCode, `${symb}Z`, 1)],
+        [2, new OpCode(opCode, `${symb}P`, 2)],
+        [3, new OpCode(opCode, `${symb}NN`, 3)],
+        [4, new OpCode(opCode, `${symb}NZ`, 4)],
+        [5, new OpCode(opCode, `${symb}NP`, 5)],
+    ]));
+}
+function IncReg(opCode: number, reg: string) {
+    return Cases(opCode, new Map([
+        [0, new OpCode(opCode, `INC${reg}`, 0)],
+        [1, new OpCode(opCode, `DEC${reg}`, 1)],
+        [2, new OpCode(opCode, `ENT${reg}`, 2)],
+        [3, new OpCode(opCode, `ENN${reg}`, 3)],
+    ]))
+}
+
+
+const characterCode = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,()+-*/=$<>@;:'";
 
 /** Util **/
 
