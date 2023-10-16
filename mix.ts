@@ -6,19 +6,79 @@ export type Byte = number;
 export type Sign = number & {readonly Sign: unique symbol};
 export const Plus: Sign = 1 as Sign;
 export const Minus: Sign = -1 as Sign;
-export type Word = [Sign, Byte, Byte, Byte, Byte, Byte];
-export const ZeroWord: Word = [Plus, 0 as Byte, 0 as Byte, 0 as Byte, 0 as Byte, 0 as Byte];
-export type Index = [Sign, Byte, Byte];
-export const ZeroIndex: Index = [Plus, 0 as Byte, 0 as Byte];
 
-function indexToWord(x: Index): Word {
-    return [x[0], 0 as Byte, 0 as Byte, 0 as Byte, x[1], x[2]];
+export class Word {
+    constructor(
+        readonly sign: Sign,
+        readonly b1: Byte,
+        readonly b2: Byte,
+        readonly b3: Byte,
+        readonly b4: Byte,
+        readonly b5: Byte,
+    ) {}
+
+    static fromIndex(x: Index): Word {
+        return new Word(x.sign, 0, 0, 0, x.b1, x.b2);
+    }
+
+    static fromNumber(x: number): Word {
+        const sign = x >= 0 ? Plus : Minus;
+        x = Math.abs(x);
+        return new Word(
+            sign,
+            (x >> 24) % 64,
+            (x >> 18) % 64,
+            (x >> 12) % 64,
+            (x >>  6) % 64,
+             x        % 64,
+        );
+    }
+
+    static Zero: Word = new Word(Plus, 0, 0, 0, 0, 0);
+
+    toNumber(): number {
+        return this.sign * (
+            (this.b1 << 24) |
+            (this.b2 << 18) |
+            (this.b3 << 12) |
+            (this.b4 << 6)  |
+             this.b5
+        );
+    }
 }
 
-function indexToString(index: Index): string {
-    const [sign, upper, lower] = index;
-    const val = sign * (upper * 64 + lower);
-    return "" + val;
+export class Index {
+    constructor(
+        readonly sign: Sign,
+        readonly b1: Byte,
+        readonly b2: Byte,
+    ) {}
+
+    static fromNumber(x: number): Index {
+        const sign = x >= 0 ? Plus : Minus;
+        x = Math.abs(x);
+        return new Index(
+            sign,
+            (x >> 6) % 64,
+             x       % 64,
+        );
+    }
+
+    static Zero: Index = new Index(Plus, 0, 0);
+
+    toNumber(): number {
+        return this.sign * ((this.b1 << 6) | this.b2);
+    }
+
+    toString(): string { return `${this.toNumber()}`; }
+}
+
+function applyField(F: Byte, word: Word): Word {
+    const L = F >> 3;
+    const R = F % 8;
+    const sign = L > 0 ? Plus : word.sign;
+    const [b1, b2, b3, b4, b5] = [word.b1, word.b2, word.b3, word.b4, word.b5].slice(L-1, R)
+    return new Word(sign, b1 ?? 0, b2 ?? 0, b3 ?? 0, b4 ?? 0, b5 ?? 0);
 }
 
 function add(a: Index, b: Index): Word {
@@ -28,7 +88,7 @@ function add(a: Index, b: Index): Word {
 
 /** Machine State **/
 
-class State {
+export class State {
     rA: Word;
     rX: Word;
     rIs: [Index, Index, Index, Index, Index, Index];
@@ -46,17 +106,42 @@ class State {
     set rI6(val: Index ) { this.rIs[5] = val; };
     rJ: [Byte, Byte]; // Behaves as if its sign was always +.
 
-    memory: Array<Word>;
+    contents: Array<Word>;
 
     constructor() {
-        this.rA = Array.from(ZeroWord) as Word;
-        this.rX = Array.from(ZeroWord) as Word;
-        this.rIs = [ZeroIndex, ZeroIndex, ZeroIndex, ZeroIndex, ZeroIndex, ZeroIndex];
+        this.rA = Word.Zero;
+        this.rX = Word.Zero;
+        this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
         this.rJ = [0 as Byte, 0 as Byte];
-        this.memory = new Array(4000);
-        for (const i in this.memory) {
-            this.memory[i] = Array.from(ZeroWord) as Word;
+        this.contents = new Array(4000);
+        for (const i in this.contents) {
+            this.contents[i] = Word.Zero;
         }
+    }
+
+    exec(instr: Instruction) {
+        switch (instr.C) {
+            case 0: // NOP
+                break;
+
+            case 8: // LDA
+                const M = instr.I === 0
+                    ? instr.AA.toNumber()
+                    : instr.AA.toNumber() + this.rIs[instr.I-1].toNumber();
+                this.rA = applyField(instr.F, this.fetch(M));
+                this.rA = this.fetch(M);
+                break;
+
+            default:
+                throw new Error(`instruction not implemented: "${instr.toText()}"`)
+        }
+    }
+
+    private fetch(addr: number): Word {
+        if (addr < 0 || addr > this.contents.length) {
+            throw new Error(`Memory address out of bounds: ${addr}`)
+        }
+        return this.contents[addr];
     }
 }
 
@@ -83,15 +168,15 @@ export class Instruction {
     readonly F: Byte;
     readonly C: Byte;
 
-    constructor(bAS: Sign, bA1: Byte, bA2: Byte, bI: Byte, bF: Byte, bC: Byte) {
-        this.AA = [bAS, bA1, bA2];
-        this.I = bI;
-        this.F = bF;
-        this.C = bC;
+    constructor(AA: Index, I: Byte, F: Byte, C: Byte) {
+        this.AA = AA;
+        this.I = I;
+        this.F = F;
+        this.C = C;
     }
 
     address(state: State): Word {
-        if (this.I === 0) return indexToWord(this.AA);
+        if (this.I === 0) return Word.fromIndex(this.AA);
         return add(this.AA, state.rIs[this.I - 1]);
     }
 
@@ -102,7 +187,7 @@ export class Instruction {
         const opCode = Instruction.opCode(this.C, this.F);
         const symbName = opCode.symbName;
         const index = this.I === 0 ? "" : "," + this.I;
-        let AA = opCode.showArg ? indexToString(this.AA) : "";
+        let AA = opCode.showArg ? this.AA.toString() : "";
         let fieldSpec = "";
         if (this.F !== opCode.normalF) {
             // TODO: Special-case the I/O instructions.
@@ -117,8 +202,8 @@ export class Instruction {
         throw NotImplementedError("toText");
     }
 
-    static fromWord(word: Word): Instruction {
-        return new Instruction(...word);
+    static fromWord(w: Word): Instruction {
+        return new Instruction(new Index(w.sign, w.b1, w.b2), w.b3, w.b4, w.b5);
     }
 
     static opCodes: Array<OpCode | ((F: Byte) => OpCode)> = [
@@ -249,6 +334,8 @@ function IncReg(opCode: number, reg: string) {
 
 
 const characterCode = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,()+-*/=$<>@;:'";
+
+
 
 /** Util **/
 
