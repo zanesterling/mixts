@@ -153,6 +153,8 @@ export class State {
     set rJ(val: Index) { this._rJ = val; }
     overflow: boolean = false;
     comparison: Comparison = "EQUAL";
+    IP: number = 0;
+    jumped: boolean = false;
 
     contents: Array<Word>;
 
@@ -257,6 +259,93 @@ export class State {
             case 33: /* STZ */ this.store(M, instr.F, Word.Zero); break;
 
 
+            /* Jump instructions */
+            case 39: // JMP, JSJ, JOV, JNOV, JL, JE, JG, JGE, JNE, JLE
+                if (instr.F === 0) this.jump(M)
+                else if (instr.F === 1) {
+                    this.IP = M;
+                    this.jumped = true;
+                } else if (instr.F === 2) {
+                    if (this.overflow) this.jump(M)
+                    this.overflow = false;
+                } else if (instr.F === 3) {
+                    if (!this.overflow) this.jump(M);
+                    this.overflow = false;
+                }
+                else if (instr.F === 4 && this.comparison === "LESS") this.jump(M);
+                else if (instr.F === 5 && this.comparison === "EQUAL") this.jump(M);
+                else if (instr.F === 6 && this.comparison === "GREATER") this.jump(M);
+                else if (instr.F === 7 && this.comparison !== "LESS") this.jump(M);
+                else if (instr.F === 8 && this.comparison !== "EQUAL") this.jump(M);
+                else if (instr.F === 9 && this.comparison !== "GREATER") this.jump(M);
+                break;
+            case 40: // JAN, JAZ, JAP, JANN, JANZ, JANP
+                if (instr.F === 0 && this.rA.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rA.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rA.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rA.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rA.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rA.sign !== Plus) this.jump(M);
+                break;
+            case 41: // J1N, J1Z, J1P, J1NN, J1NZ, J1NP
+                if (instr.F === 0 && this.rI1.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI1.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI1.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI1.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI1.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI1.sign !== Plus) this.jump(M);
+                break;
+            case 42: // J2N, J2Z, J2P, J2NN, J2NZ, J2NP
+                if (instr.F === 0 && this.rI2.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI2.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI2.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI2.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI2.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI2.sign !== Plus) this.jump(M);
+                break;
+            case 43: // J3N, J3Z, J3P, J3NN, J3NZ, J3NP
+                if (instr.F === 0 && this.rI3.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI3.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI3.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI3.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI3.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI3.sign !== Plus) this.jump(M);
+                break;
+            case 44: // J4N, J4Z, J4P, J4NN, J4NZ, J4NP
+                if (instr.F === 0 && this.rI4.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI4.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI4.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI4.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI4.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI4.sign !== Plus) this.jump(M);
+                break;
+            case 45: // J5N, J5Z, J5P, J5NN, J5NZ, J5NP
+                if (instr.F === 0 && this.rI5.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI5.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI5.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI5.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI5.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI5.sign !== Plus) this.jump(M);
+                break;
+            case 46: // J6N, J6Z, J6P, J6NN, J6NZ, J6NP
+                if (instr.F === 0 && this.rI6.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rI6.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rI6.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rI6.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rI6.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rI6.sign !== Plus) this.jump(M);
+                break;
+            case 47: // JXN, JXZ, JXP, JXNN, JXNZ, JXNP
+                if (instr.F === 0 && this.rX.sign === Minus) this.jump(M);
+                else if (instr.F === 1 && this.rX.toNumber() === 0) this.jump(M);
+                else if (instr.F === 2 && this.rX.sign === Plus) this.jump(M);
+                else if (instr.F === 3 && this.rX.sign !== Minus) this.jump(M);
+                else if (instr.F === 4 && this.rX.toNumber() !== 0) this.jump(M);
+                else if (instr.F === 5 && this.rX.sign !== Plus) this.jump(M);
+                break;
+
+
+            /* Address transfer operators */
             case 48: /* INCA, DECA, ENTA, ENNA */
                 if (instr.F === 0) { this.add(M); }
                 else if (instr.F === 1) { this.add(-M); }
@@ -361,6 +450,9 @@ export class State {
             default:
                 throw new Error(`instruction not implemented: "${instr.toText()}"`)
         }
+
+        if (!this.jumped) this.IP++;
+        this.jumped = false;
     }
 
     getmem(addr: number): Word {
@@ -415,6 +507,12 @@ export class State {
             val > 0 ? Plus : val < 0 ? Minus : this.rA.sign,
             w.b1, w.b2, w.b3, w.b4, w.b5
         );
+    }
+
+    private jump(M: number) {
+        this.rJ = Index.fromNumber(this.IP + 1);
+        this.IP = M;
+        this.jumped = true;
     }
 }
 
