@@ -74,11 +74,19 @@ export class Index {
 }
 
 function applyField(F: Byte, word: Word): Word {
-    const L = F >> 3;
+    let L = F >> 3;
     const R = F % 8;
-    const sign = L > 0 ? Plus : word.sign;
-    const [b1, b2, b3, b4, b5] = [word.b1, word.b2, word.b3, word.b4, word.b5].slice(L-1, R)
-    return new Word(sign, b1 ?? 0, b2 ?? 0, b3 ?? 0, b4 ?? 0, b5 ?? 0);
+    let sign = Plus;
+    if (L === 0) {
+        L = 1;
+        sign = word.sign;
+    }
+    const [b5, b4, b3, b2, b1] = [word.b1, word.b2, word.b3, word.b4, word.b5]
+        .slice(L-1, R)
+        // Reverse and assign into b5..b1 so so that shorter slices shift
+        // towards lower values.
+        .reverse();
+    return new Word(sign ?? Plus, b1 ?? 0, b2 ?? 0, b3 ?? 0, b4 ?? 0, b5 ?? 0);
 }
 
 function add(a: Index, b: Index): Word {
@@ -129,7 +137,6 @@ export class State {
                     ? instr.AA.toNumber()
                     : instr.AA.toNumber() + this.rIs[instr.I-1].toNumber();
                 this.rA = applyField(instr.F, this.fetch(M));
-                this.rA = this.fetch(M);
                 break;
 
             default:
