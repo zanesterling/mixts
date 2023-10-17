@@ -6,8 +6,11 @@ export type Byte = number;
 export type Sign = number & {readonly Sign: unique symbol};
 export const Plus: Sign = 1 as Sign;
 export const Minus: Sign = -1 as Sign;
+function signof(x: bigint): Sign { return x < 0 ? Minus : Plus; }
 
 export class Word {
+    static MAX = (1 << 30) - 1;
+
     constructor(
         readonly sign: Sign,
         readonly b1: Byte,
@@ -23,6 +26,18 @@ export class Word {
 
     static fromNumber(x: number): Word {
         const sign = x >= 0 ? Plus : Minus;
+        x = Math.abs(x);
+        return new Word(
+            sign,
+            (x >> 24) % 64,
+            (x >> 18) % 64,
+            (x >> 12) % 64,
+            (x >>  6) % 64,
+             x        % 64,
+        );
+    }
+
+    static fromSignNumber(sign: Sign, x: number): Word {
         x = Math.abs(x);
         return new Word(
             sign,
@@ -114,8 +129,8 @@ function add(a: Index, b: Index): Word {
 /** Machine State **/
 
 export class State {
-    rA: Word;
-    rX: Word;
+    rA: Word = Word.Zero;
+    rX: Word = Word.Zero;
     rIs: [Index, Index, Index, Index, Index, Index];
     get rI1(): Index { return this.rIs[0]};
     get rI2(): Index { return this.rIs[1]; };
@@ -129,19 +144,15 @@ export class State {
     set rI4(val: Index) { this.rIs[3] = val; };
     set rI5(val: Index) { this.rIs[4] = val; };
     set rI6(val: Index) { this.rIs[5] = val; };
-
-    // Behaves as if its sign was always +.
-    _rJ: Index;
+    _rJ: Index = Index.Zero; // Behaves as if its sign was always +.
     get rJ(): Index { return new Index(this._rJ.sign, this._rJ.b1, this._rJ.b2); }
     set rJ(val: Index) { this._rJ = val; }
+    overflow: boolean = false;
 
     contents: Array<Word>;
 
     constructor() {
-        this.rA = Word.Zero;
-        this.rX = Word.Zero;
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
-        this._rJ = Index.Zero;
         this.contents = new Array(4000);
         for (const i in this.contents) {
             this.contents[i] = Word.Zero;
@@ -150,9 +161,60 @@ export class State {
 
     exec(instr: Instruction) {
         const M = this.fetchIndex(instr.I).toNumber() + instr.AA.toNumber();
+        const V = this.load(M, instr.F);
         switch (instr.C) {
             case 0: // NOP
                 break;
+
+
+            /* Arithmetic instructions */
+            case 1: { // ADD
+                if (instr.F == 6) throw NotImplementedError("FADD");
+                const val = this.rA.toNumber() + V.toNumber();
+                if (val > Word.MAX) this.overflow = true;
+                const w = Word.fromNumber(val);
+                this.rA = new Word(
+                    val > 0 ? Plus : val < 0 ? Minus : this.rA.sign,
+                    w.b1, w.b2, w.b3, w.b4, w.b5
+                );
+                break;
+            }
+            case 2: { // SUB
+                if (instr.F == 6) throw NotImplementedError("FSUB");
+                const val = this.rA.toNumber() - V.toNumber();
+                if (val > Word.MAX) this.overflow = true;
+                const w = Word.fromNumber(val);
+                this.rA = new Word(
+                    val > 0 ? Plus : val < 0 ? Minus : this.rA.sign,
+                    w.b1, w.b2, w.b3, w.b4, w.b5
+                );
+                break;
+            }
+            case 3: { // MUL
+                if (instr.F == 6) throw NotImplementedError("FMUL");
+                const val = BigInt(this.rA.toNumber()) * BigInt(V.toNumber());
+                const sign = signof(val);
+                const valA = BigInt.asIntN(30, abs(val) >> 30n);
+                const valX = BigInt.asIntN(30, abs(val) % BigInt(1 << 30));
+                this.rA = Word.fromSignNumber(sign, Number(valA));
+                this.rX = Word.fromSignNumber(sign, Number(valX));
+                break;
+            }
+            case 4: { // DIV
+                if (instr.F == 6) throw NotImplementedError("FDIV");
+                if (V.toNumber() === 0) {
+                    this.overflow = true;
+                    break;
+                }
+                const presign = this.rA.sign;
+                const rAX = (BigInt(this.rA.toNumber()) << 30n) +
+                            BigInt(presign * Math.abs(this.rX.toNumber()));
+                const vn = BigInt(V.toNumber());
+                const [quot, rem] = [rAX / vn, rAX % vn];
+                this.rA = Word.fromNumber(Number(quot));
+                this.rX = Word.fromSignNumber(presign, Number(rem));
+                break;
+            }
 
 
             /* Load instructions */
@@ -247,6 +309,10 @@ export class State {
         const rABytes = this.rA.bytes().slice(5-N, 5);
         setn(bytes, L-1, R, rABytes);
         this.setmem(M, new Word(sign, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]));
+    }
+
+    private load(M: number, F: Byte): Word {
+        return ldApplyField(F, this.getmem(M));
     }
 }
 
@@ -453,4 +519,8 @@ function setn<T>(xs: Array<T>, start: number, end: number, ys: Array<T>) {
     for (let i = 0; i < end-start; i++) {
         xs[start+i] = ys[i];
     }
+}
+
+function abs(x: bigint): bigint {
+    return x > 0n ? x : -x;
 }

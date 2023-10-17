@@ -119,7 +119,100 @@ describe("mix", () => {
                 })
             }
         });
-        test.todo("Arithmetic");
+
+        describe("Arithmetic", () => {
+            test("ADD  1000", () => {
+                const state = new State();
+                state.rA = new Word(Plus, 19, 18, 1, 2, 22);
+                state.setmem(1000, new Word(Plus, 1, 36, 5, 0, 50));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 1);
+                expect(instr.toText()).toStrictEqual("ADD  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Plus, 20, 54, 6, 3, 8));
+            });
+
+            test("SUB  1000", () => {
+                const state = new State();
+                state.rA = new Word(Minus, 19, 18, 0, 0, 9);
+                state.setmem(1000, new Word(Minus, 31, 16, 2, 22, 0));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 2);
+                expect(instr.toText()).toStrictEqual("SUB  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Plus, 11, 62, 2, 21, 55));
+            });
+
+            test("MUL  1000", () => {
+                const state = new State();
+                state.rA = new Word(Plus, 1, 1, 1, 1, 1);
+                state.setmem(1000, new Word(Plus, 1, 1, 1, 1, 1));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 3);
+                expect(instr.toText()).toStrictEqual("MUL  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Plus, 0, 1, 2, 3, 4));
+                expect(state.rX).toStrictEqual(new Word(Plus, 5, 4, 3, 2, 1));
+            });
+
+            test("MUL  1000(1:1)", () => {
+                const state = new State();
+                state.rA = new Word(Minus, 0, 0, 0, 1, 48);
+                state.setmem(1000, new Word(Plus, 2, 1, 2, 3, 4));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 9, 3);
+                expect(instr.toText()).toStrictEqual("MUL  1000(1:1)");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Minus, 0, 0, 0, 0, 0));
+                expect(state.rX).toStrictEqual(new Word(Minus, 0, 0, 0, 3, 32));
+            });
+
+            test("MUL  1000 (minus)", () => {
+                const state = new State();
+                state.rA = new Word(Minus, 50, 0, 1, 48, 4);
+                state.setmem(1000, new Word(Minus, 2, 0, 0, 0, 0));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 3);
+                expect(instr.toText()).toStrictEqual("MUL  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Plus, 1, 36, 0, 3, 32));
+                expect(state.rX).toStrictEqual(new Word(Plus, 8, 0, 0, 0, 0));
+            });
+
+            test("DIV  1000 (plus)", () => {
+                const state = new State();
+                state.rA = Word.fromNumber(0);
+                state.rX = Word.fromNumber(17);
+                state.setmem(1000, Word.fromNumber(3));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 4);
+                expect(instr.toText()).toStrictEqual("DIV  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(Word.fromNumber(5));
+                expect(state.rX).toStrictEqual(Word.fromNumber(2));
+            });
+
+            test("DIV  1000 (minus)", () => {
+                const state = new State();
+                state.rA = new Word(Minus, 0, 0, 0, 0, 0);
+                state.rX = new Word(Plus, 1235 >> 6, 1235 % 64, 0, 3, 1);
+                state.setmem(1000, new Word(Minus, 0, 0, 0, 2, 0));
+                const instr = new Instruction(Index.fromNumber(1000), 0, 5, 4);
+                expect(instr.toText()).toStrictEqual("DIV  1000");
+
+                state.exec(instr);
+
+                expect(state.rA).toStrictEqual(new Word(Plus, 0, 617 >> 6, 617 % 64, 32, 1));
+                expect(state.rX).toStrictEqual(new Word(Minus, 0, 0, 0, 1, 1));
+            });
+        });
+
         test.todo("Address Transfer");
         test.todo("Comparison");
         test.todo("Jump");
