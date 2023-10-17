@@ -45,6 +45,21 @@ export class Word {
              this.b5
         );
     }
+
+    toIndex(): Index {
+        if (this.b1 !== 0 || this.b2 !== 0 || this.b3 !== 0) {
+            throw new Error("tried to convert non-zero Word to Index");
+        }
+        return new Index(this.sign, this.b4, this.b5);
+    }
+
+    negate(): Word {
+        return new Word((this.sign * -1) as Sign, this.b1, this.b2, this.b3, this.b4, this.b5);
+    }
+
+    bytes(): Byte[] {
+        return [this.b1, this.b2, this.b3, this.b4, this.b5];
+    }
 }
 
 export class Index {
@@ -71,9 +86,11 @@ export class Index {
     }
 
     toString(): string { return `${this.toNumber()}`; }
+
+    toWord(): Word { return new Word(this.sign, 0, 0, 0, this.b1, this.b2); }
 }
 
-function applyField(F: Byte, word: Word): Word {
+function ldApplyField(F: Byte, word: Word): Word {
     let L = F >> 3;
     const R = F % 8;
     let sign = Plus;
@@ -106,13 +123,17 @@ export class State {
     get rI4(): Index { return this.rIs[3]; };
     get rI5(): Index { return this.rIs[4]; };
     get rI6(): Index { return this.rIs[5]; };
-    set rI1(val: Index ) { this.rIs[0] = val; };
-    set rI2(val: Index ) { this.rIs[1] = val; };
-    set rI3(val: Index ) { this.rIs[2] = val; };
-    set rI4(val: Index ) { this.rIs[3] = val; };
-    set rI5(val: Index ) { this.rIs[4] = val; };
-    set rI6(val: Index ) { this.rIs[5] = val; };
-    rJ: [Byte, Byte]; // Behaves as if its sign was always +.
+    set rI1(val: Index) { this.rIs[0] = val; };
+    set rI2(val: Index) { this.rIs[1] = val; };
+    set rI3(val: Index) { this.rIs[2] = val; };
+    set rI4(val: Index) { this.rIs[3] = val; };
+    set rI5(val: Index) { this.rIs[4] = val; };
+    set rI6(val: Index) { this.rIs[5] = val; };
+
+    // Behaves as if its sign was always +.
+    _rJ: Index;
+    get rJ(): Index { return new Index(this._rJ.sign, this._rJ.b1, this._rJ.b2); }
+    set rJ(val: Index) { this._rJ = val; }
 
     contents: Array<Word>;
 
@@ -120,7 +141,7 @@ export class State {
         this.rA = Word.Zero;
         this.rX = Word.Zero;
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
-        this.rJ = [0 as Byte, 0 as Byte];
+        this._rJ = Index.Zero;
         this.contents = new Array(4000);
         for (const i in this.contents) {
             this.contents[i] = Word.Zero;
@@ -128,27 +149,104 @@ export class State {
     }
 
     exec(instr: Instruction) {
+        const M = this.fetchIndex(instr.I).toNumber() + instr.AA.toNumber();
         switch (instr.C) {
             case 0: // NOP
                 break;
 
+
+            /* Load instructions */
             case 8: // LDA
-                const M = instr.I === 0
-                    ? instr.AA.toNumber()
-                    : instr.AA.toNumber() + this.rIs[instr.I-1].toNumber();
-                this.rA = applyField(instr.F, this.fetch(M));
+                this.rA = ldApplyField(instr.F, this.getmem(M));
                 break;
+            case 9:  // LD1
+            case 10: // LD2
+            case 11: // LD3
+            case 12: // LD4
+            case 13: // LD5
+            case 14: // LD6
+                this.rIs[instr.C - 9] = ldApplyField(instr.F, this.getmem(M)).toIndex();
+                break;
+            case 15: // LDX
+                this.rX = ldApplyField(instr.F, this.getmem(M));
+                break;
+
+            case 16: // LDAN
+                this.rA = ldApplyField(instr.F, this.getmem(M)).negate();
+                break;
+            case 17: // LD1N
+            case 18: // LD2N
+            case 19: // LD3N
+            case 20: // LD4N
+            case 21: // LD5N
+            case 22: // LD6N
+                this.rIs[instr.C - 17] = ldApplyField(instr.F, this.getmem(M))
+                    .negate()
+                    .toIndex();
+                break;
+            case 23: // LDXN
+                this.rX = ldApplyField(instr.F, this.getmem(M)).negate();
+                break;
+
+
+            /* Store instructions */
+            case 24: /* STA */ this.store(M, instr.F, this.rA); break;
+            case 25: // ST1
+            case 26: // ST2
+            case 27: // ST3
+            case 28: // ST4
+            case 29: // ST5
+            case 30: // ST6
+                this.store(M, instr.F, this.rIs[instr.C-25].toWord());
+                break;
+            case 31: /* STX */ this.store(M, instr.F, this.rX); break;
+            case 32: /* STJ */ this.store(M, instr.F, this.rJ.toWord()); break;
+            case 33: /* STZ */ this.store(M, instr.F, Word.Zero); break;
+
 
             default:
                 throw new Error(`instruction not implemented: "${instr.toText()}"`)
         }
     }
 
-    private fetch(addr: number): Word {
+    getmem(addr: number): Word {
         if (addr < 0 || addr > this.contents.length) {
             throw new Error(`Memory address out of bounds: ${addr}`)
         }
         return this.contents[addr];
+    }
+
+    setmem(addr: number, val: Word) {
+        if (addr < 0 || addr > this.contents.length) {
+            throw new Error(`Memory address out of bounds: ${addr}`)
+        }
+        this.contents[addr] = val;
+    }
+
+    private fetchIndex(index: number): Index {
+        if (index === 0) return Index.Zero;
+        if (index > 6) throw new Error(`tried to fetch bad rI: ${index}`);
+        return this.rIs[index-1];
+    }
+
+    // Pull the last `N` bytes from `reg` and put them into bytes L':R in CONTENTS[M].
+    // `N` = `R-L'+1`
+    // `L'` = `L === 0 ? 1 : L`
+    // `F` = `8*L + R`
+    private store(M: number, F: Byte, reg: Word) {
+        const mem = this.getmem(M);
+        let L = F >> 3;
+        const R = F % 8;
+        let sign = mem.sign;
+        if (L === 0) {
+            L = 1;
+            sign = this.rA.sign;
+        }
+        const N = R - L + 1;
+        const bytes = mem.bytes();
+        const rABytes = this.rA.bytes().slice(5-N, 5);
+        setn(bytes, L-1, R, rABytes);
+        this.setmem(M, new Word(sign, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]));
     }
 }
 
@@ -254,12 +352,12 @@ export class Instruction {
         new OpCode(22, "LD6N", 5),
         new OpCode(23, "LDXN", 5),
         new OpCode(24, "STA", 5),
-        new OpCode(25, "ST1", 5),
-        new OpCode(26, "ST2", 5),
-        new OpCode(27, "ST3", 5),
-        new OpCode(28, "ST4", 5),
-        new OpCode(29, "ST5", 5),
-        new OpCode(30, "ST6", 5),
+        new OpCode(25, "ST1", 2),
+        new OpCode(26, "ST2", 2),
+        new OpCode(27, "ST3", 2),
+        new OpCode(28, "ST4", 2),
+        new OpCode(29, "ST5", 2),
+        new OpCode(30, "ST6", 2),
         new OpCode(31, "STX", 5),
         new OpCode(32, "STJ", 2),
         new OpCode(33, "STZ", 5),
@@ -350,4 +448,9 @@ function NotImplementedError(funcName: string) {
     return new Error(`Function ${funcName} not implemented.`);
 }
 
-console.log("Hello via Bun!");
+
+function setn<T>(xs: Array<T>, start: number, end: number, ys: Array<T>) {
+    for (let i = 0; i < end-start; i++) {
+        xs[start+i] = ys[i];
+    }
+}

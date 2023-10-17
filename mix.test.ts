@@ -74,7 +74,51 @@ describe("mix", () => {
             }
         });
 
-        test.todo("ST*");
+        describe("ST*", () => {
+            const state = new State();
+            state.rA = new Word(Plus, 6, 7, 8, 9, 0);
+
+            const testCases = [
+                {
+                    assembly: "STA  2000",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 5, 24),
+                    result: new Word(Plus, 6, 7, 8, 9, 0),
+                },
+                {
+                    assembly: "STA  2000(1:5)",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 13, 24),
+                    result: new Word(Minus, 6, 7, 8, 9, 0),
+                },
+                {
+                    assembly: "STA  2000(5:5)",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 45, 24),
+                    result: new Word(Minus, 1, 2, 3, 4, 0),
+                },
+                {
+                    assembly: "STA  2000(2:2)",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 18, 24),
+                    result: new Word(Minus, 1, 0, 3, 4, 5),
+                },
+                {
+                    assembly: "STA  2000(2:3)",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 19, 24),
+                    result: new Word(Minus, 1, 9, 0, 4, 5),
+                },
+                {
+                    assembly: "STA  2000(0:1)",
+                    instruction: new Instruction(Index.fromNumber(2000), 0, 1, 24),
+                    result: new Word(Plus, 0, 2, 3, 4, 5),
+                },
+            ];
+            for (const testCase of testCases) {
+                test(testCase.assembly, () => {
+                    expect(testCase.instruction.toText()).toBe(testCase.assembly);
+                    state.contents[2000] = new Word(Minus, 1, 2, 3, 4, 5);
+                    state.exec(testCase.instruction);
+                    expect(state.contents[2000]).toStrictEqual(testCase.result);
+                })
+            }
+        });
         test.todo("Arithmetic");
         test.todo("Address Transfer");
         test.todo("Comparison");
