@@ -7,6 +7,10 @@ export type Sign = number & {readonly Sign: unique symbol};
 export const Plus: Sign = 1 as Sign;
 export const Minus: Sign = -1 as Sign;
 function signof(x: bigint): Sign { return x < 0 ? Minus : Plus; }
+export type Comparison = "LESS" | "EQUAL" | "GREATER";
+function compare(a: number, b: number): Comparison {
+    return a < b ? "LESS" : a === b ? "EQUAL" : "GREATER";
+}
 
 export class Word {
     static MAX = (1 << 30) - 1;
@@ -148,6 +152,7 @@ export class State {
     get rJ(): Index { return new Index(this._rJ.sign, this._rJ.b1, this._rJ.b2); }
     set rJ(val: Index) { this._rJ = val; }
     overflow: boolean = false;
+    comparison: Comparison = "EQUAL";
 
     contents: Array<Word>;
 
@@ -300,6 +305,57 @@ export class State {
                 else if (instr.F === 2) this.rX = Word.fromNumber(M);
                 else if (instr.F === 3) this.rX = Word.fromNumber(-M);
                 break;
+
+
+            /* Comparison operators */
+            case 56: { // CMPA
+                const A = ldApplyField(instr.F, this.rA).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 57: { // CMP1
+                const A = ldApplyField(instr.F, this.rI1.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 58: { // CMP2
+                const A = ldApplyField(instr.F, this.rI2.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 59: { // CMP3
+                const A = ldApplyField(instr.F, this.rI3.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 60: { // CMP4
+                const A = ldApplyField(instr.F, this.rI4.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 61: { // CMP5
+                const A = ldApplyField(instr.F, this.rI5.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 62: { // CMP6
+                const A = ldApplyField(instr.F, this.rI6.toWord()).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
+            case 63: { // CMPX
+                const A = ldApplyField(instr.F, this.rX).toNumber();
+                const B = ldApplyField(instr.F, this.getmem(M)).toNumber();
+                this.comparison = compare(A, B);
+                break;
+            }
 
 
             default:
