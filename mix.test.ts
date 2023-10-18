@@ -1,6 +1,9 @@
 import { describe, expect, test, beforeAll } from "bun:test";
 
-import { State, Instruction, Word, Index, Byte, Sign, Plus, Minus } from "./mix";
+import {
+    State, Instruction, Word, Index, Byte, Sign, Plus, Minus,
+    padLeft, padRight, leftRot, rightRot,
+} from "./mix";
 
 beforeAll(() => {
     // setup tests
@@ -216,9 +219,47 @@ describe("mix", () => {
         test.todo("Address Transfer");
         test.todo("Comparison");
         test.todo("Jump");
-        test.todo("Shift");
+
+        test("Shift", () => {
+            const state = new State();
+            state.rA = new Word(Plus, 1, 2, 3, 4, 5);
+            state.rX = new Word(Minus, 6, 7, 8, 9, 10);
+
+            state.exec(new Instruction(Index.fromNumber(1), 0, 3, 6));
+            expect(state.rA).toStrictEqual(new Word(Plus, 0, 1, 2, 3, 4));
+            expect(state.rX).toStrictEqual(new Word(Minus, 5, 6, 7, 8, 9));
+            state.exec(new Instruction(Index.fromNumber(2), 0, 0, 6));
+            expect(state.rA).toStrictEqual(new Word(Plus, 2, 3, 4, 0, 0));
+            expect(state.rX).toStrictEqual(new Word(Minus, 5, 6, 7, 8, 9));
+            state.exec(new Instruction(Index.fromNumber(4), 0, 5, 6));
+            expect(state.rA).toStrictEqual(new Word(Plus, 6, 7, 8, 9, 2));
+            expect(state.rX).toStrictEqual(new Word(Minus, 3, 4, 0, 0, 5));
+            state.exec(new Instruction(Index.fromNumber(2), 0, 1, 6));
+            expect(state.rA).toStrictEqual(new Word(Plus, 0, 0, 6, 7, 8));
+            expect(state.rX).toStrictEqual(new Word(Minus, 3, 4, 0, 0, 5));
+            state.exec(new Instruction(Index.fromNumber(501), 0, 4, 6));
+            expect(state.rA).toStrictEqual(new Word(Plus, 0, 6, 7, 8, 3));
+            expect(state.rX).toStrictEqual(new Word(Minus, 4, 0, 0, 5, 0));
+        });
+
         test.todo("Move");
         test.todo("I/O");
         test.todo("CHAR & NUM");
+    });
+});
+
+describe("utils", () => {
+    test("padLeft", () => {
+        expect(padLeft([1, 2, 3], 5, 0)).toStrictEqual([0, 0, 1, 2, 3]);
+    });
+    test("padRight", () => {
+        expect(padRight([1, 2, 3], 5, 0)).toStrictEqual([1, 2, 3, 0, 0]);
+    });
+
+    test("leftRot", () => {
+        expect(leftRot([1,2,3,4,5], 3)).toStrictEqual([4,5,1,2,3]);
+    });
+    test("rightRot", () => {
+        expect(rightRot([1,2,3,4,5], 3)).toStrictEqual([3,4,5,1,2]);
     });
 });

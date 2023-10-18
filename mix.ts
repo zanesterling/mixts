@@ -168,7 +168,6 @@ export class State {
 
     exec(instr: Instruction) {
         const M = this.fetchIndex(instr.I).toNumber() + instr.AA.toNumber();
-        const V = this.load(M, instr.F);
         switch (instr.C) {
             case 0: // NOP
                 break;
@@ -177,15 +176,16 @@ export class State {
             /* Arithmetic instructions */
             case 1: // ADD
                 if (instr.F == 6) throw NotImplementedError("FADD");
-                this.add(V.toNumber());
+                this.add(this.load(M, instr.F).toNumber());
                 break;
             case 2: // SUB
                 if (instr.F == 6) throw NotImplementedError("FSUB");
-                this.add(-V.toNumber());
+                this.add(-this.load(M, instr.F).toNumber());
                 break;
             case 3: { // MUL
                 if (instr.F == 6) throw NotImplementedError("FMUL");
-                const val = BigInt(this.rA.toNumber()) * BigInt(V.toNumber());
+                const val = BigInt(this.rA.toNumber()) *
+                    BigInt(this.load(M, instr.F).toNumber());
                 const sign = signof(val);
                 const valA = BigInt.asIntN(30, abs(val) >> 30n);
                 const valX = BigInt.asIntN(30, abs(val) % BigInt(1 << 30));
@@ -195,19 +195,58 @@ export class State {
             }
             case 4: { // DIV
                 if (instr.F == 6) throw NotImplementedError("FDIV");
-                if (V.toNumber() === 0) {
+                if (this.load(M, instr.F).toNumber() === 0) {
                     this.overflow = true;
                     break;
                 }
                 const presign = this.rA.sign;
                 const rAX = (BigInt(this.rA.toNumber()) << 30n) +
                             BigInt(presign * Math.abs(this.rX.toNumber()));
-                const vn = BigInt(V.toNumber());
+                const vn = BigInt(this.load(M, instr.F).toNumber());
                 const [quot, rem] = [rAX / vn, rAX % vn];
                 this.rA = Word.fromNumber(Number(quot));
                 this.rX = Word.fromSignNumber(presign, Number(rem));
                 break;
             }
+
+            
+            case 6: // SLA, SRA, SLAX, SRAX, SLC, SRC
+                if (instr.F === 0) { // SLA
+                    const bytes = this.rA.bytes().slice(M, 5);
+                    const [b1, b2, b3, b4, b5] = padRight(bytes, 5, 0);
+                    this.rA = new Word(this.rA.sign, b1, b2, b3, b4, b5);
+                } else if (instr.F === 1) { // SRA
+                    const bytes = this.rA.bytes().slice(0, 5-M);
+                    const [b1, b2, b3, b4, b5] = padLeft(bytes, 5, 0);
+                    this.rA = new Word(this.rA.sign, b1, b2, b3, b4, b5);
+                } else if (instr.F === 2) { // SLAX
+                    const bytes = [...this.rA.bytes(), ...this.rX.bytes()]
+                        .slice(M, 10);
+                    const [a1, a2, a3, a4, a5, x1, x2, x3, x4, x5] =
+                        padRight(bytes, 10, 0);
+                    this.rA = new Word(this.rA.sign, a1, a2, a3, a4, a5);
+                    this.rX = new Word(this.rX.sign, x1, x2, x3, x4, x5);
+                } else if (instr.F === 3) { // SRAX
+                    const bytes = [...this.rA.bytes(), ...this.rX.bytes()]
+                        .slice(0, 10-M);
+                    const [a1, a2, a3, a4, a5, x1, x2, x3, x4, x5] =
+                        padLeft(bytes, 10, 0);
+                    this.rA = new Word(this.rA.sign, a1, a2, a3, a4, a5);
+                    this.rX = new Word(this.rX.sign, x1, x2, x3, x4, x5);
+                } else if (instr.F === 4) { // SLC
+                    const bytes = [...this.rA.bytes(), ...this.rX.bytes()];
+                    const [a1, a2, a3, a4, a5, x1, x2, x3, x4, x5] =
+                        leftRot(bytes, M);
+                    this.rA = new Word(this.rA.sign, a1, a2, a3, a4, a5);
+                    this.rX = new Word(this.rX.sign, x1, x2, x3, x4, x5);
+                } else if (instr.F === 5) { // SRC
+                    const bytes = [...this.rA.bytes(), ...this.rX.bytes()];
+                    const [a1, a2, a3, a4, a5, x1, x2, x3, x4, x5] =
+                        rightRot(bytes, M);
+                    this.rA = new Word(this.rA.sign, a1, a2, a3, a4, a5);
+                    this.rX = new Word(this.rX.sign, x1, x2, x3, x4, x5);
+                }
+                break;
 
 
             /* Load instructions */
@@ -723,4 +762,44 @@ function setn<T>(xs: Array<T>, start: number, end: number, ys: Array<T>) {
 
 function abs(x: bigint): bigint {
     return x > 0n ? x : -x;
+}
+
+export function padLeft<T>(xs: Array<T>, n: number, x: T): Array<T> {
+    const ret = new Array(n);
+    for (let i = 0; i < n - xs.length; i++) {
+        ret[i] = x;
+    }
+    for (let i = 0; i < xs.length; i++) {
+        ret[i + (n-xs.length)] = xs[i];
+    }
+    return ret;
+}
+
+export function padRight<T>(xs: Array<T>, n: number, x: T): Array<T> {
+    const ret = new Array(n);
+    for (let i = 0; i < xs.length; i++) {
+        ret[i] = xs[i];
+    }
+    for (let i = xs.length; i < n; i++) {
+        ret[i] = x;
+    }
+    return ret;
+}
+
+export function leftRot<T>(xs: Array<T>, n: number): Array<T> {
+    const ret = new Array(xs.length);
+    const len = xs.length;
+    for (let i = 0; i < xs.length; i++) {
+        ret[i] = xs[((i+n) % len + len) % len];
+    }
+    return ret;
+}
+
+export function rightRot<T>(xs: Array<T>, n: number): Array<T> {
+    const ret = new Array(xs.length);
+    const len = xs.length;
+    for (let i = 0; i < xs.length; i++) {
+        ret[i] = xs[((i-n) % len + len) % len];
+    }
+    return ret;
 }
