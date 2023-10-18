@@ -249,6 +249,15 @@ export class State {
                 break;
 
 
+            case 7: // MOVE
+                const rI1 = this.rI1.toNumber();
+                for (let i = 0; i < instr.F; i++) {
+                    this.setmem(rI1 + i, this.getmem(M + i));
+                }
+                this.rI1 = Index.fromNumber(rI1 + instr.F);
+                break;
+
+
             /* Load instructions */
             case 8: // LDA
                 this.rA = ldApplyField(instr.F, this.getmem(M));

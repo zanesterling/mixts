@@ -242,7 +242,34 @@ describe("mix", () => {
             expect(state.rX).toStrictEqual(new Word(Minus, 4, 0, 0, 5, 0));
         });
 
-        test.todo("Move");
+        describe("Move", () => {
+            test("nonoverlapping", () => {
+                const state = new State();
+                for (let i = 0; i < 10; i++) {
+                    state.setmem(1000+i, Word.fromNumber(i+1));
+                }
+                state.rI1 = Index.fromNumber(999);
+
+                state.exec(new Instruction(Index.fromNumber(1000), 0, 5, 7));
+
+                expect(state.contents.slice(999, 1004).map(w => w.toNumber()))
+                    .toStrictEqual([1, 2, 3, 4, 5]);
+            });
+
+            test("overlapping", () => {
+                const state = new State();
+                for (let i = 0; i < 10; i++) {
+                    state.setmem(1000+i, Word.fromNumber(i+1));
+                }
+                state.rI1 = Index.fromNumber(1001);
+
+                state.exec(new Instruction(Index.fromNumber(1000), 0, 5, 7));
+
+                expect(state.contents.slice(1001, 1006).map(w => w.toNumber()))
+                    .toStrictEqual([1, 1, 1, 1, 1]);
+            });
+        });
+
         test.todo("I/O");
         test.todo("CHAR & NUM");
     });
