@@ -155,8 +155,9 @@ export class State {
     comparison: Comparison = "EQUAL";
     IP: number = 0;
     jumped: boolean = false;
-
     contents: Array<Word>;
+
+    clock: bigint = 0n;
 
     constructor() {
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
@@ -232,6 +233,7 @@ export class State {
                     this.rA = new Word(this.rA.sign, bs[0], bs[1], bs[2], bs[3], bs[4]);
                     this.rX = new Word(this.rX.sign, bs[5], bs[6], bs[7], bs[8], bs[9]);
                 } else if (instr.F === 2) { // HLT
+                    return NotImplementedError("HLT");
                 }
                 break;
 
@@ -526,6 +528,22 @@ export class State {
 
             default:
                 throw new Error(`instruction not implemented: "${instr.toText()}"`)
+        }
+
+        if (instr.C === 1 || instr.C === 2 || instr.C === 6 ||
+            (8 <= instr.C && 33 <= instr.C) || instr.C >= 56) {
+            this.clock += 2n;
+        } else if (instr.C === 7) { // MOVE
+            this.clock += 1n + BigInt(instr.F);
+        } else if (
+            instr.C === 3 ||
+            (instr.C === 5 && (instr.F === 0 || instr.F === 1))) {
+            this.clock += 10n;
+        } else if (instr.C === 4) {
+            this.clock += 12n;
+        } else {
+            this.clock += 1n;
+            // TODO: Implement float timings.
         }
 
         if (!this.jumped) this.IP++;
