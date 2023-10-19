@@ -664,8 +664,26 @@ export class Instruction {
         return `${symbName}  ${suffix}`
     }
 
-    static fromText(str: string): Instruction {
-        throw NotImplementedError("toText");
+    static fromText(line: string): Instruction {
+        // regex matches things like:
+        //     LDA 2000,2(0:3)
+        // Where the ",2" and "(0:3)" are optional.
+        const regex = /^\W*([a-zA-Z1-6]+)\W+(-?[0-9]+)(,[0-5])?(\([0-9]:[0-9]\))?\W*$/;
+        const r = line.match(regex);
+        if (r === null) {
+            throw new Error(`failed to parse instruction from line:\n${line}`);
+        }
+        const [s, symbName, Astr, Istr, Fstr] = r;
+        const opCode = Instruction.opCodesByName().get(symbName);
+        if (opCode === undefined) {
+            throw new Error(`bad opcode name: "${symbName}" in line "${line}"`);
+        }
+        const I = Istr ? Number(Istr.slice(1)) : 0;
+        const F = Fstr
+            ? 8 * Number(Fstr.slice(1, 2)) + Number(Fstr.slice(3,4))
+            : opCode.normalF;
+        return new Instruction(
+            Index.fromNumber(Number(Astr)), I, F, opCode.opCode);
     }
 
     static fromWord(w: Word): Instruction {
@@ -695,7 +713,7 @@ export class Instruction {
             [4, new OpCode(6, "SLC", 4)],
             [5, new OpCode(6, "SRC", 5)],
         ])),
-        Cases(7, new Map([[1, new OpCode(7, "MOVE", 1)]])),
+        new OpCode(7, "MOVE", 1),
         new OpCode(8,  "LDA", 5),
         new OpCode(9,  "LD1", 5),
         new OpCode(10, "LD2", 5),
@@ -771,6 +789,109 @@ export class Instruction {
         if (x instanceof OpCode) return x;
         return x(F);
     }
+
+
+    static _opCodesByName = new Map<string, OpCode>();
+    static opCodesByName(): Map<string, OpCode> {
+        if (Instruction._opCodesByName.size === 0) {
+            const codes: Array<[string, OpCode]> = [
+                ["NOP", new OpCode(0, "NOP", 0, false)],
+                ["FADD", new OpCode(1, "FADD", 6)],
+                ["ADD", new OpCode(1, "ADD", 5)],
+                ["FSUB", new OpCode(2, "FSUB", 6)],
+                ["SUB", new OpCode(2, "SUB", 5)],
+                ["FMUL", new OpCode(3, "FMUL", 6)],
+                ["MUL", new OpCode(3, "MUL", 5)],
+                ["FDIV", new OpCode(4, "FDIV", 6)],
+                ["DIV", new OpCode(4, "DIV", 5)],
+                ["NUM", new OpCode(5, "NUM", 0)],
+                ["CHAR", new OpCode(5, "CHAR", 1)],
+                ["HLT", new OpCode(5, "HLT", 2)],
+                ["SLA", new OpCode(6, "SLA", 0)],
+                ["SRA", new OpCode(6, "SRA", 1)],
+                ["SLAX", new OpCode(6, "SLAX", 2)],
+                ["SRAX", new OpCode(6, "SRAX", 3)],
+                ["SLC", new OpCode(6, "SLC", 4)],
+                ["SRC", new OpCode(6, "SRC", 5)],
+                ["MOVE", new OpCode(7, "MOVE", 1)],
+                ["LDA", new OpCode(8,  "LDA", 5)],
+                ["LD1", new OpCode(9,  "LD1", 5)],
+                ["LD2", new OpCode(10, "LD2", 5)],
+                ["LD3", new OpCode(11, "LD3", 5)],
+                ["LD4", new OpCode(12, "LD4", 5)],
+                ["LD5", new OpCode(13, "LD5", 5)],
+                ["LD6", new OpCode(14, "LD6", 5)],
+                ["LDX", new OpCode(15, "LDX", 5)],
+                ["LDAN", new OpCode(16, "LDAN", 5)],
+                ["LD1N", new OpCode(17, "LD1N", 5)],
+                ["LD2N", new OpCode(18, "LD2N", 5)],
+                ["LD3N", new OpCode(19, "LD3N", 5)],
+                ["LD4N", new OpCode(20, "LD4N", 5)],
+                ["LD5N", new OpCode(21, "LD5N", 5)],
+                ["LD6N", new OpCode(22, "LD6N", 5)],
+                ["LDXN", new OpCode(23, "LDXN", 5)],
+                ["STA", new OpCode(24, "STA", 5)],
+                ["ST1", new OpCode(25, "ST1", 2)],
+                ["ST2", new OpCode(26, "ST2", 2)],
+                ["ST3", new OpCode(27, "ST3", 2)],
+                ["ST4", new OpCode(28, "ST4", 2)],
+                ["ST5", new OpCode(29, "ST5", 2)],
+                ["ST6", new OpCode(30, "ST6", 2)],
+                ["STX", new OpCode(31, "STX", 5)],
+                ["STJ", new OpCode(32, "STJ", 2)],
+                ["STZ", new OpCode(33, "STZ", 5)],
+                ["JBUS", new OpCode(34, "JBUS", 0)],
+                ["IOC", new OpCode(35, "IOC", 0)],
+                ["IN", new OpCode(36, "IN", 0)],
+                ["OUT", new OpCode(37, "OUT", 0)],
+                ["JRED", new OpCode(38, "JRED", 0)],
+                ["JMP", new OpCode(39, "JMP", 0)],
+                ["JSJ", new OpCode(39, "JSJ", 1)],
+                ["JOV", new OpCode(39, "JOV", 2)],
+                ["JNOV", new OpCode(39, "JNOV", 3)],
+                ["JL", new OpCode(39, "JL", 4)],
+                ["JE", new OpCode(39, "JE", 5)],
+                ["JG", new OpCode(39, "JG", 6)],
+                ["JGE", new OpCode(39, "JGE", 7)],
+                ["JNE", new OpCode(39, "JNE", 8)],
+                ["JLE", new OpCode(39, "JLE", 9)],
+                ["FCMP", new OpCode(56, "FCMP", 6)],
+                ["CMPA", new OpCode(56, "CMPA", 5)],
+                ["CMP1", new OpCode(57, "CMP1", 5)],
+                ["CMP2", new OpCode(58, "CMP2", 5)],
+                ["CMP3", new OpCode(59, "CMP3", 5)],
+                ["CMP4", new OpCode(60, "CMP4", 5)],
+                ["CMP5", new OpCode(61, "CMP5", 5)],
+                ["CMP6", new OpCode(62, "CMP6", 5)],
+                ["CMPX", new OpCode(63, "CMPX", 5)],
+            ];
+            const moreCodes = [
+                JRegByName(40, "JA"),
+                JRegByName(41, "J1"),
+                JRegByName(42, "J2"),
+                JRegByName(43, "J3"),
+                JRegByName(44, "J4"),
+                JRegByName(45, "J5"),
+                JRegByName(46, "J6"),
+                JRegByName(47, "JX"),
+                IncRegByName(48, "A"),
+                IncRegByName(49, "1"),
+                IncRegByName(50, "2"),
+                IncRegByName(51, "3"),
+                IncRegByName(52, "4"),
+                IncRegByName(53, "5"),
+                IncRegByName(54, "6"),
+                IncRegByName(55, "X"),
+            ].flat();
+            for (const [name, opCode] of codes) {
+                this._opCodesByName.set(name, opCode);
+            }
+            for (const [name, opCode] of moreCodes) {
+                this._opCodesByName.set(name, opCode);
+            }
+        }
+        return Instruction._opCodesByName;
+    }
 }
 
 function Cases(opCode: number, codes: Map<number, OpCode>): ((F: Byte) => OpCode) {
@@ -789,6 +910,16 @@ function JReg(opCode: number, symb: string) {
         [5, new OpCode(opCode, `${symb}NP`, 5)],
     ]));
 }
+function JRegByName(opCode: number, symb: string): Array<[string, OpCode]> {
+    return [
+        [`${symb}N`, new OpCode(opCode, `${symb}N`, 0)],
+        [`${symb}Z`, new OpCode(opCode, `${symb}Z`, 1)],
+        [`${symb}P`, new OpCode(opCode, `${symb}P`, 2)],
+        [`${symb}NN`, new OpCode(opCode, `${symb}NN`, 3)],
+        [`${symb}NZ`, new OpCode(opCode, `${symb}NZ`, 4)],
+        [`${symb}NP`, new OpCode(opCode, `${symb}NP`, 5)],
+    ]
+}
 function IncReg(opCode: number, reg: string) {
     return Cases(opCode, new Map([
         [0, new OpCode(opCode, `INC${reg}`, 0)],
@@ -796,6 +927,14 @@ function IncReg(opCode: number, reg: string) {
         [2, new OpCode(opCode, `ENT${reg}`, 2)],
         [3, new OpCode(opCode, `ENN${reg}`, 3)],
     ]))
+}
+function IncRegByName(opCode: number, reg: string): Array<[string, OpCode]> {
+    return [
+        [`INC${reg}`, new OpCode(opCode, `INC${reg}`, 0)],
+        [`DEC${reg}`, new OpCode(opCode, `DEC${reg}`, 1)],
+        [`ENT${reg}`, new OpCode(opCode, `ENT${reg}`, 2)],
+        [`ENN${reg}`, new OpCode(opCode, `ENN${reg}`, 3)],
+    ];
 }
 
 

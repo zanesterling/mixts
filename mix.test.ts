@@ -12,19 +12,34 @@ beforeAll(() => {
 describe("mix", () => {
     describe("can render instructions to text", () => {
         test("LDA", () => {
-            expect(new Instruction(Index.fromNumber(2000),  2, 3,  8).toText()).toBe("LDA  2000,2(0:3)");
-            expect(new Instruction(Index.fromNumber(2000),  2, 11, 8).toText()).toBe("LDA  2000,2(1:3)");
-            expect(new Instruction(Index.fromNumber(2000),  0, 11, 8).toText()).toBe("LDA  2000(1:3)");
-            expect(new Instruction(Index.fromNumber(2000),  0, 5,  8).toText()).toBe("LDA  2000");
-            expect(new Instruction(Index.fromNumber(-2000), 4, 5,  8).toText()).toBe("LDA  -2000,4");
+            expect(new Instruction(Index.fromNumber(2000),  2, 3,  8).toText())
+                .toBe("LDA  2000,2(0:3)");
+            expect(new Instruction(Index.fromNumber(2000),  2, 11, 8).toText())
+                .toBe("LDA  2000,2(1:3)");
+            expect(new Instruction(Index.fromNumber(2000),  0, 11, 8).toText())
+                .toBe("LDA  2000(1:3)");
+            expect(new Instruction(Index.fromNumber(2000),  0, 5,  8).toText())
+                .toBe("LDA  2000");
+            expect(new Instruction(Index.fromNumber(-2000), 4, 5,  8).toText())
+                .toBe("LDA  -2000,4");
         });
 
         test("NOP", () => {
-            expect(new Instruction(new Index(Plus, 0, 0), 0, 0, 0).toText()).toBe("NOP");
+            expect(new Instruction(new Index(Plus, 0, 0), 0, 0, 0).toText())
+                .toBe("NOP");
         });
     });
 
-    test.todo("can parse instructions");
+    describe("instruction parsing", () => {
+        test("circular parsing matches", () => {
+            for (const [symbName, opCode] of Instruction.opCodesByName()) {
+                if (symbName === "NOP") continue;
+                const s = `${symbName}  1000`;
+                expect(Instruction.fromText(`${symbName} 1000`).toText())
+                    .toStrictEqual(s);
+            }
+        });
+    });
 
     describe("behavior", () => {
         describe("LD*", () => {
