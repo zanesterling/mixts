@@ -49,45 +49,37 @@ describe("mix", () => {
             const testCases = [
                 {
                     assembly: "LDA  2000",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 5, 8),
                     result: new Word(Minus, 1, 16, 3, 5, 4),
                 },
                 {
                     assembly: "LDA  2000(1:5)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 13, 8),
                     result: new Word(Plus, 1, 16, 3, 5, 4),
                 },
                 {
                     assembly: "LDA  2000(3:5)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 29, 8),
                     result: new Word(Plus, 0, 0, 3, 5, 4),
                 },
                 {
                     assembly: "LDA  2000(0:3)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 3, 8),
                     result: new Word(Minus, 0, 0, 1, 16, 3),
                 },
                 {
                     assembly: "LDA  2000(4:4)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 36, 8),
                     result: new Word(Plus, 0, 0, 0, 0, 5),
                 },
                 {
                     assembly: "LDA  2000(0:0)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 0, 8),
                     result: new Word(Minus, 0, 0, 0, 0, 0),
                 },
                 {
                     assembly: "LDA  2000(1:1)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 9, 8),
                     result: new Word(Plus, 0, 0, 0, 0, 1),
                 },
             ];
-            for (const testCase of testCases) {
-                test(testCase.assembly, () => {
-                    expect(testCase.instruction.toText()).toBe(testCase.assembly);
-                    state.exec(testCase.instruction);
-                    expect(state.rA).toStrictEqual(testCase.result);
+            for (const {assembly, result} of testCases) {
+                test(assembly, () => {
+                    state.exec(Instruction.fromText(assembly));
+                    expect(state.rA).toStrictEqual(result);
                 });
             }
         });
@@ -99,41 +91,34 @@ describe("mix", () => {
             const testCases = [
                 {
                     assembly: "STA  2000",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 5, 24),
                     result: new Word(Plus, 6, 7, 8, 9, 0),
                 },
                 {
                     assembly: "STA  2000(1:5)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 13, 24),
                     result: new Word(Minus, 6, 7, 8, 9, 0),
                 },
                 {
                     assembly: "STA  2000(5:5)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 45, 24),
                     result: new Word(Minus, 1, 2, 3, 4, 0),
                 },
                 {
                     assembly: "STA  2000(2:2)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 18, 24),
                     result: new Word(Minus, 1, 0, 3, 4, 5),
                 },
                 {
                     assembly: "STA  2000(2:3)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 19, 24),
                     result: new Word(Minus, 1, 9, 0, 4, 5),
                 },
                 {
                     assembly: "STA  2000(0:1)",
-                    instruction: new Instruction(Index.fromNumber(2000), 0, 1, 24),
                     result: new Word(Plus, 0, 2, 3, 4, 5),
                 },
             ];
-            for (const testCase of testCases) {
-                test(testCase.assembly, () => {
-                    expect(testCase.instruction.toText()).toBe(testCase.assembly);
+            for (const {assembly, result} of testCases) {
+                test(assembly, () => {
                     state.contents[2000] = new Word(Minus, 1, 2, 3, 4, 5);
-                    state.exec(testCase.instruction);
-                    expect(state.contents[2000]).toStrictEqual(testCase.result);
+                    state.exec(Instruction.fromText(assembly));
+                    expect(state.contents[2000]).toStrictEqual(result);
                 })
             }
         });
