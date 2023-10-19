@@ -158,6 +158,8 @@ export class State {
     contents: Array<Word>;
 
     clock: bigint = 0n;
+    halt: boolean = false;
+    memfault: boolean = false;
 
     constructor() {
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
@@ -233,7 +235,7 @@ export class State {
                     this.rA = new Word(this.rA.sign, bs[0], bs[1], bs[2], bs[3], bs[4]);
                     this.rX = new Word(this.rX.sign, bs[5], bs[6], bs[7], bs[8], bs[9]);
                 } else if (instr.F === 2) { // HLT
-                    return NotImplementedError("HLT");
+                    this.halt = true;
                 }
                 break;
 
@@ -548,6 +550,21 @@ export class State {
 
         if (!this.jumped) this.IP++;
         this.jumped = false;
+    }
+
+    go() {
+        // TODO: Implement real GO button.
+        this.halt = false;
+        this.memfault = false;
+
+        while (!this.halt) {
+            if (this.IP < 0 || this.IP >= this.contents.length) {
+                this.memfault = true;
+                this.halt = true;
+            }
+            const instr = this.contents[this.IP];
+            this.exec(Instruction.fromWord(instr));
+        }
     }
 
     getmem(addr: number): Word {
