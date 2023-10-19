@@ -209,6 +209,32 @@ export class State {
                 break;
             }
 
+
+            case 5: // NUM, CHAR, HLT
+                if (instr.F === 0) { // NUM
+                    const bytes = this.rA.bytes().concat(this.rX.bytes());
+                    let val = 0;
+                    for (let i = 0; i < bytes.length; i++) {
+                        val = val*10 + bytes[i] % 10;
+                    }
+                    if (val > Word.MAX) {
+                        val = val % (Word.MAX+1);
+                        this.overflow = true;
+                    }
+                    this.rA = Word.fromSignNumber(this.rA.sign, val);
+                } else if (instr.F === 1) { // CHAR
+                    const bs: number[] = new Array(10);
+                    let val = Math.abs(this.rA.toNumber());
+                    for (let i = 0; i < 10; i++) {
+                        bs[10-i-1] = 30 + val % 10;
+                        val = Math.floor(val / 10);
+                    }
+                    this.rA = new Word(this.rA.sign, bs[0], bs[1], bs[2], bs[3], bs[4]);
+                    this.rX = new Word(this.rX.sign, bs[5], bs[6], bs[7], bs[8], bs[9]);
+                } else if (instr.F === 2) { // HLT
+                }
+                break;
+
             
             case 6: // SLA, SRA, SLAX, SRAX, SLC, SRC
                 if (instr.F === 0) { // SLA
@@ -305,6 +331,9 @@ export class State {
             case 31: /* STX */ this.store(M, instr.F, this.rX); break;
             case 32: /* STJ */ this.store(M, instr.F, this.rJ.toWord()); break;
             case 33: /* STZ */ this.store(M, instr.F, Word.Zero); break;
+
+
+            /* IO Instructions */
 
 
             /* Jump instructions */

@@ -271,7 +271,21 @@ describe("mix", () => {
         });
 
         test.todo("I/O");
-        test.todo("CHAR & NUM");
+        test("NUM & CHAR", () => {
+            const state = new State();
+            state.rA = new Word(Minus, 0, 0, 31, 32, 39);
+            state.rX = new Word(Plus, 37, 57, 47, 30, 30);
+
+            state.exec(new Instruction(Index.fromNumber(0), 0, 0, 5)); // NUM 0
+            expect(state.rA).toStrictEqual(Word.fromNumber(-12977700));
+            expect(state.rX).toStrictEqual(new Word(Plus, 37, 57, 47, 30, 30));
+            state.exec(new Instruction(Index.fromNumber(1), 0, 0, 48)); // INCA 1
+            expect(state.rA).toStrictEqual(Word.fromNumber(-12977699));
+            expect(state.rX).toStrictEqual(new Word(Plus, 37, 57, 47, 30, 30));
+            state.exec(new Instruction(Index.fromNumber(0), 0, 1, 5)); // CHAR 0
+            expect(state.rA).toStrictEqual(new Word(Minus, 30, 30, 31, 32, 39));
+            expect(state.rX).toStrictEqual(new Word(Plus, 37, 37, 36, 39, 39));
+        });
     });
 });
 
