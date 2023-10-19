@@ -955,7 +955,7 @@ function IncRegByName(opCode: number, reg: string): Array<[string, OpCode]> {
 }
 
 
-const characterCode = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,()+-*/=$<>@;:'";
+const characterCode = " ABCDEFGHIJKLMNOPQRΣΠSTUVWXYZ0123456789.,()+-*/=$<>@;:'";
 
 
 
