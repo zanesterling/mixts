@@ -304,3 +304,30 @@ describe("utils", () => {
         expect(rightRot([1,2,3,4,5], 3)).toStrictEqual([3,4,5,1,2]);
     });
 });
+
+describe.only("1.3.1", () => {
+    test("Problem 16", () => {
+        // (a) Shortest possible.
+        let state = new State();
+        for (let i = 0; i < 101; i++) state.setmem(i, Word.fromNumber(1));
+        state.exec(Instruction.fromText("STZ 0000"));
+        state.exec(Instruction.fromText("ENT1 0001"));
+        state.exec(Instruction.fromText("MOVE 0000(7:7)"));
+        state.exec(Instruction.fromText("MOVE 0063(4:4)"));
+        expect(state.contents.slice(0, 100).every(w => w.toNumber() === 0))
+            .toBeTrue();
+        expect(state.getmem(100)).toStrictEqual(Word.fromNumber(1));
+        expect(state.clock).toStrictEqual(204n);
+
+        // (b) Fastest possible.
+        state = new State();
+        for (let i = 0; i < 101; i++) state.setmem(i, Word.fromNumber(1));
+        for (let i = 0; i < 100; i++) {
+            state.exec(Instruction.fromText(`STZ ${i}`));
+        }
+        expect(state.contents.slice(0, 100).every(w => w.toNumber() === 0))
+            .toBeTrue();
+        expect(state.getmem(100)).toStrictEqual(Word.fromNumber(1));
+        expect(state.clock).toStrictEqual(200n);
+    });
+});

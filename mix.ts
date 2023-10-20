@@ -539,7 +539,7 @@ export class State {
             (8 <= instr.C && 33 <= instr.C) || instr.C >= 56) {
             this.clock += 2n;
         } else if (instr.C === 7) { // MOVE
-            this.clock += 1n + BigInt(instr.F);
+            this.clock += 1n + 2n*BigInt(instr.F);
         } else if (
             instr.C === 3 ||
             (instr.C === 5 && (instr.F === 0 || instr.F === 1))) {
