@@ -164,12 +164,13 @@ export class State {
     constructor() {
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
         this.contents = new Array(4000);
-        for (const i in this.contents) {
+        for (let i = 0; i < this.contents.length; i++) {
             this.contents[i] = Word.Zero;
         }
     }
 
     exec(instr: Instruction) {
+        this.jumped = false;
         const M = this.fetchIndex(instr.I).toNumber() + instr.AA.toNumber();
         switch (instr.C) {
             case 0: // NOP
@@ -369,12 +370,13 @@ export class State {
                 else if (instr.F === 5 && this.rA.sign !== Plus) this.jump(M);
                 break;
             case 41: // J1N, J1Z, J1P, J1NN, J1NZ, J1NP
+                // TODO: Fix all the neg/pos/etc.
                 if (instr.F === 0 && this.rI1.sign === Minus) this.jump(M);
                 else if (instr.F === 1 && this.rI1.toNumber() === 0) this.jump(M);
                 else if (instr.F === 2 && this.rI1.sign === Plus) this.jump(M);
                 else if (instr.F === 3 && this.rI1.sign !== Minus) this.jump(M);
                 else if (instr.F === 4 && this.rI1.toNumber() !== 0) this.jump(M);
-                else if (instr.F === 5 && this.rI1.sign !== Plus) this.jump(M);
+                else if (instr.F === 5 && this.rI1.toNumber() <= 0) this.jump(M);
                 break;
             case 42: // J2N, J2Z, J2P, J2NN, J2NZ, J2NP
                 if (instr.F === 0 && this.rI2.sign === Minus) this.jump(M);
@@ -434,8 +436,9 @@ export class State {
                 else if (instr.F === 3) this.rA = Word.fromNumber(-M);
                 break;
             case 49: /* INC1, DEC1, ENT1, ENN1 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                // TODO: fix INC and DEC for all
+                if (instr.F === 0) { this.rI1 = Index.fromNumber(this.rI1.toNumber() + M); }
+                else if (instr.F === 1) { this.rI1 = Index.fromNumber(this.rI1.toNumber() - M); }
                 else if (instr.F === 2) this.rI1 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI1 = Index.fromNumber(-M);
                 break;
@@ -549,7 +552,15 @@ export class State {
         }
 
         if (!this.jumped) this.IP++;
-        this.jumped = false;
+    }
+
+    step() {
+        if (this.IP < 0 || this.IP >= this.contents.length) {
+            this.memfault = true;
+            this.halt = true;
+        }
+        const instr = this.contents[this.IP];
+        this.exec(Instruction.fromWord(instr));
     }
 
     go() {
@@ -557,14 +568,7 @@ export class State {
         this.halt = false;
         this.memfault = false;
 
-        while (!this.halt) {
-            if (this.IP < 0 || this.IP >= this.contents.length) {
-                this.memfault = true;
-                this.halt = true;
-            }
-            const instr = this.contents[this.IP];
-            this.exec(Instruction.fromWord(instr));
-        }
+        while (!this.halt) this.step();
     }
 
     getmem(addr: number): Word {
@@ -602,8 +606,8 @@ export class State {
         }
         const N = R - L + 1;
         const bytes = mem.bytes();
-        const rABytes = this.rA.bytes().slice(5-N, 5);
-        setn(bytes, L-1, R, rABytes);
+        const regBytes = reg.bytes().slice(5-N, 5);
+        setn(bytes, L-1, R, regBytes);
         this.setmem(M, new Word(sign, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4]));
     }
 
@@ -679,6 +683,11 @@ export class Instruction {
         const suffix = `${AA}${index}${fieldSpec}`;
         if (suffix === "") return symbName;
         return `${symbName}  ${suffix}`
+    }
+
+    toWord(): Word {
+        return new Word(
+            this.AA.sign, this.AA.b1, this.AA.b2, this.I, this.F, this.C);
     }
 
     static fromText(line: string): Instruction {
