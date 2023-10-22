@@ -295,7 +295,33 @@ describe("mix", () => {
             });
         });
 
-        test.todo("Address Transfer");
+        describe("ENT*, ENN*, INC*, DEC*", () => {
+            const state = new State();
+            const testWord = new Word(Minus, 1, 2, 3, 4, 5);
+            // ENT*, ENN*, INC*, DEC*
+            for (const {testName, name, reg} of [
+                { testName: "A",  name: "A", reg: (state: State) => state.rA},
+                { testName: "X",  name: "X", reg: (state: State) => state.rX},
+                { testName: "I1", name: "1", reg: (state: State) => state.rI1},
+                { testName: "I2", name: "2", reg: (state: State) => state.rI2},
+                { testName: "I3", name: "3", reg: (state: State) => state.rI3},
+                { testName: "I4", name: "4", reg: (state: State) => state.rI4},
+                { testName: "I5", name: "5", reg: (state: State) => state.rI5},
+                { testName: "I6", name: "6", reg: (state: State) => state.rI6},
+            ]) {
+                test(testName, () => {
+                    state.exec(Instruction.fromText(`ENT${name} 3000`));
+                    expect(reg(state).toNumber()).toStrictEqual(3000);
+                    state.exec(Instruction.fromText(`INC${name} 5`));
+                    expect(reg(state).toNumber()).toStrictEqual(3005);
+                    state.exec(Instruction.fromText(`DEC${name} 5`));
+                    expect(reg(state).toNumber()).toStrictEqual(3000);
+                    state.exec(Instruction.fromText(`ENN${name} 3000`));
+                    expect(reg(state).toNumber()).toStrictEqual(-3000);
+                });
+            }
+        });
+
         test.todo("Comparison");
         test.todo("Jump");
 

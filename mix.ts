@@ -88,13 +88,16 @@ export class Index {
         readonly b2: Byte,
     ) {}
 
+    static MAX: number = 64 * 64 - 1;
+
     static fromNumber(x: number): Index {
         const sign = x >= 0 ? Plus : Minus;
-        x = Math.abs(x);
+        const xAbs = Math.abs(x);
+        if (xAbs > Index.MAX) throw new Error(`too big for index: ${x}`)
         return new Index(
             sign,
-            (x >> 6) % 64,
-             x       % 64,
+            (xAbs >> 6) % 64,
+             xAbs       % 64,
         );
     }
 
@@ -123,10 +126,6 @@ function ldApplyField(F: Byte, word: Word): Word {
         // towards lower values.
         .reverse();
     return new Word(sign ?? Plus, b1 ?? 0, b2 ?? 0, b3 ?? 0, b4 ?? 0, b5 ?? 0);
-}
-
-function add(a: Index, b: Index): Word {
-    throw NotImplementedError("add");
 }
 
 
@@ -180,11 +179,11 @@ export class State {
             /* Arithmetic instructions */
             case 1: // ADD
                 if (instr.F == 6) throw NotImplementedError("FADD");
-                this.add(this.load(M, instr.F).toNumber());
+                this.rA = this.add(this.load(M, instr.F).toNumber(), this.rA);
                 break;
             case 2: // SUB
                 if (instr.F == 6) throw NotImplementedError("FSUB");
-                this.add(-this.load(M, instr.F).toNumber());
+                this.rA = this.add(-this.load(M, instr.F).toNumber(), this.rA);
                 break;
             case 3: { // MUL
                 if (instr.F == 6) throw NotImplementedError("FMUL");
@@ -430,51 +429,52 @@ export class State {
 
             /* Address transfer operators */
             case 48: /* INCA, DECA, ENTA, ENNA */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rA = this.add(M, this.rA);
+                else if (instr.F === 1) this.rA = this.add(-M, this.rA);
                 else if (instr.F === 2) this.rA = Word.fromNumber(M);
                 else if (instr.F === 3) this.rA = Word.fromNumber(-M);
                 break;
             case 49: /* INC1, DEC1, ENT1, ENN1 */
                 // TODO: fix INC and DEC for all
-                if (instr.F === 0) { this.rI1 = Index.fromNumber(this.rI1.toNumber() + M); }
-                else if (instr.F === 1) { this.rI1 = Index.fromNumber(this.rI1.toNumber() - M); }
+                const regI = instr.C - 49;
+                if      (instr.F === 0) this.rI1 = this.addIndex(M, this.rI1);
+                else if (instr.F === 1) this.rI1 = this.addIndex(-M, this.rI1);
                 else if (instr.F === 2) this.rI1 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI1 = Index.fromNumber(-M);
                 break;
             case 50: /* INC2, DEC2, ENT2, ENN2 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rI2 = this.addIndex(M, this.rI2);
+                else if (instr.F === 1) this.rI2 = this.addIndex(-M, this.rI2);
                 else if (instr.F === 2) this.rI2 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI2 = Index.fromNumber(-M);
                 break;
             case 51: /* INC3, DEC3, ENT3, ENN3 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rI3 = this.addIndex(M, this.rI3);
+                else if (instr.F === 1) this.rI3 = this.addIndex(-M, this.rI3);
                 else if (instr.F === 2) this.rI3 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI3 = Index.fromNumber(-M);
                 break;
             case 52: /* INC4, DEC4, ENT4, ENN4 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rI4 = this.addIndex(M, this.rI4);
+                else if (instr.F === 1) this.rI4 = this.addIndex(-M, this.rI4);
                 else if (instr.F === 2) this.rI4 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI4 = Index.fromNumber(-M);
                 break;
             case 53: /* INC5, DEC5, ENT5, ENN5 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rI5 = this.addIndex(M, this.rI5);
+                else if (instr.F === 1) this.rI5 = this.addIndex(-M, this.rI5);
                 else if (instr.F === 2) this.rI5 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI5 = Index.fromNumber(-M);
                 break;
             case 54: /* INC6, DEC6, ENT6, ENN6 */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rI6 = this.addIndex(M, this.rI6);
+                else if (instr.F === 1) this.rI6 = this.addIndex(-M, this.rI6);
                 else if (instr.F === 2) this.rI6 = Index.fromNumber(M);
                 else if (instr.F === 3) this.rI6 = Index.fromNumber(-M);
                 break;
             case 55: /* INCX, DECX, ENTX, ENNX */
-                if (instr.F === 0) { this.add(M); }
-                else if (instr.F === 1) { this.add(-M); }
+                if      (instr.F === 0) this.rX = this.add(M, this.rX);
+                else if (instr.F === 1) this.rX = this.add(-M, this.rX);
                 else if (instr.F === 2) this.rX = Word.fromNumber(M);
                 else if (instr.F === 3) this.rX = Word.fromNumber(-M);
                 break;
@@ -615,14 +615,22 @@ export class State {
         return ldApplyField(F, this.getmem(M));
     }
 
-    add(x: number) {
-        const val = this.rA.toNumber() + x;
+    add(x: number, y: Word|Index): Word {
+        const val = y.toNumber() + x;
         if (val > Word.MAX) this.overflow = true;
         const w = Word.fromNumber(val);
-        this.rA = new Word(
-            val > 0 ? Plus : val < 0 ? Minus : this.rA.sign,
+        return new Word(
+            val > 0 ? Plus : val < 0 ? Minus : y.sign,
             w.b1, w.b2, w.b3, w.b4, w.b5
         );
+    }
+
+    addIndex(x: number, y: Index): Index {
+        const val = y.toNumber() + x;
+        if (val > Index.MAX) throw new Error("index overflowed!");
+        const ret = Index.fromNumber(val);
+        return new Index(val > 0 ? Plus : val < 0 ? Minus : y.sign,
+            ret.b1, ret.b2);
     }
 
     private jump(M: number) {
@@ -660,11 +668,6 @@ export class Instruction {
         this.I = I;
         this.F = F;
         this.C = C;
-    }
-
-    address(state: State): Word {
-        if (this.I === 0) return Word.fromIndex(this.AA);
-        return add(this.AA, state.rIs[this.I - 1]);
     }
 
     toText(): string {
