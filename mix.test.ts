@@ -95,6 +95,57 @@ describe("mix", () => {
             }
         });
 
+        describe("LD*N", () => {
+            const state = new State();
+            state.contents[2000] = new Word(Minus, 1, 16, 3, 5, 4);
+
+            const ldTest = (
+                reg: ((s: State) => any),
+                instr: string,
+                out: any) => {
+                test(instr, () => {
+                    state.exec(Instruction.fromText(instr));
+                    expect(reg(state)).toStrictEqual(out);
+                });
+            };
+
+            const regs = [
+                { op: "LDAN", reg: (state: State) => state.rA },
+                { op: "LDXN", reg: (state: State) => state.rX },
+            ];
+            for (const {op, reg} of regs) {
+                let testCases = [
+                    { instr: `${op}  2000`,      out: new Word(Plus, 1, 16, 3, 5, 4) },
+                    { instr: `${op}  2000(4:4)`, out: new Word(Minus, 0, 0, 0, 0, 5) },
+                    { instr: `${op}  2000(0:0)`, out: new Word(Plus, 0, 0, 0, 0, 0) },
+                    { instr: `${op}  2000(1:1)`, out: new Word(Minus, 0, 0, 0, 0, 1) },
+                    { instr: `${op}  2000(1:5)`, out: new Word(Minus, 1, 16, 3, 5, 4) },
+                    { instr: `${op}  2000(3:5)`, out: new Word(Minus, 0, 0, 3, 5, 4) },
+                    { instr: `${op}  2000(0:3)`, out: new Word(Plus, 0, 0, 1, 16, 3) },
+                ];
+                for (const {instr, out} of testCases) {
+                    ldTest(reg, instr, out);
+                }
+            }
+
+            for (const {op, reg} of [
+                { op: "LD1N", reg: (state: State) => state.rI1 },
+                { op: "LD2N", reg: (state: State) => state.rI2 },
+                { op: "LD3N", reg: (state: State) => state.rI3 },
+                { op: "LD4N", reg: (state: State) => state.rI4 },
+                { op: "LD5N", reg: (state: State) => state.rI5 },
+                { op: "LD6N", reg: (state: State) => state.rI6 },
+            ]) {
+                for (const {instr, out} of [
+                    { instr: `${op}  2000(4:4)`, out: new Index(Minus, 0, 5) },
+                    { instr: `${op}  2000(0:0)`, out: new Index(Plus, 0, 0) },
+                    { instr: `${op}  2000(1:1)`, out: new Index(Minus, 0, 1) },
+                ]) {
+                    ldTest(reg, instr, out);
+                }
+            }
+        });
+
         describe("ST*", () => {
             const state = new State();
             state.rA = new Word(Plus, 6, 7, 8, 9, 0);
