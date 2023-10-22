@@ -31,12 +31,14 @@ describe("mix", () => {
     });
 
     describe("instruction parsing", () => {
-        test("circular parsing matches", () => {
+        describe("circular parsing", () => {
             for (const [symbName, opCode] of Instruction.opCodesByName()) {
                 if (symbName === "NOP") continue;
-                const s = `${symbName}  1000`;
-                expect(Instruction.fromText(`${symbName} 1000`).toText())
-                    .toStrictEqual(s);
+                test(symbName, () => {
+                    const s = `${symbName}  1000`;
+                    expect(Instruction.fromText(`${symbName} 1000`).toText())
+                        .toStrictEqual(s);
+                });
             }
         });
     });
@@ -96,39 +98,56 @@ describe("mix", () => {
         describe("ST*", () => {
             const state = new State();
             state.rA = new Word(Plus, 6, 7, 8, 9, 0);
+            state.rX = new Word(Plus, 6, 7, 8, 9, 0);
+            state.rI1 = new Index(Plus, 6, 7);
+            state.rI2 = new Index(Plus, 6, 7);
+            state.rI3 = new Index(Plus, 6, 7);
+            state.rI4 = new Index(Plus, 6, 7);
+            state.rI5 = new Index(Plus, 6, 7);
+            state.rI6 = new Index(Plus, 6, 7);
 
-            const testCases = [
-                {
-                    assembly: "STA  2000",
-                    result: new Word(Plus, 6, 7, 8, 9, 0),
-                },
-                {
-                    assembly: "STA  2000(1:5)",
-                    result: new Word(Minus, 6, 7, 8, 9, 0),
-                },
-                {
-                    assembly: "STA  2000(5:5)",
-                    result: new Word(Minus, 1, 2, 3, 4, 0),
-                },
-                {
-                    assembly: "STA  2000(2:2)",
-                    result: new Word(Minus, 1, 0, 3, 4, 5),
-                },
-                {
-                    assembly: "STA  2000(2:3)",
-                    result: new Word(Minus, 1, 9, 0, 4, 5),
-                },
-                {
-                    assembly: "STA  2000(0:1)",
-                    result: new Word(Plus, 0, 2, 3, 4, 5),
-                },
-            ];
-            for (const {assembly, result} of testCases) {
-                test(assembly, () => {
+            const stTest = (instr: string, out: Word) => {
+                test(instr, () => {
                     state.contents[2000] = new Word(Minus, 1, 2, 3, 4, 5);
-                    state.exec(Instruction.fromText(assembly));
-                    expect(state.contents[2000]).toStrictEqual(result);
-                })
+                    state.exec(Instruction.fromText(instr));
+                    expect(state.contents[2000]).toStrictEqual(out);
+                });
+            };
+
+            for (const op of ["STA", "STX"]) {
+                for (const {instr, out} of [
+                    { instr: `${op}  2000`,      out: new Word(Plus, 6, 7, 8, 9, 0) },
+                    { instr: `${op}  2000(1:5)`, out: new Word(Minus, 6, 7, 8, 9, 0) },
+                    { instr: `${op}  2000(5:5)`, out: new Word(Minus, 1, 2, 3, 4, 0) },
+                    { instr: `${op}  2000(2:2)`, out: new Word(Minus, 1, 0, 3, 4, 5) },
+                    { instr: `${op}  2000(2:3)`, out: new Word(Minus, 1, 9, 0, 4, 5) },
+                    { instr: `${op}  2000(0:1)`, out: new Word(Plus, 0, 2, 3, 4, 5) },
+                ]) {
+                    stTest(instr, out);
+                }
+            }
+
+            for (const op of ["ST1", "ST2", "ST3", "ST4", "ST5", "ST6"]) {
+                for (const {instr, out} of [
+                    { instr: `${op}  2000`,      out: new Word(Plus, 0, 0, 0, 6, 7) },
+                    { instr: `${op}  2000(1:5)`, out: new Word(Minus, 0, 0, 0, 6, 7) },
+                    { instr: `${op}  2000(5:5)`, out: new Word(Minus, 1, 2, 3, 4, 7) },
+                    { instr: `${op}  2000(2:2)`, out: new Word(Minus, 1, 7, 3, 4, 5) },
+                    { instr: `${op}  2000(2:3)`, out: new Word(Minus, 1, 6, 7, 4, 5) },
+                    { instr: `${op}  2000(0:1)`, out: new Word(Plus, 7, 2, 3, 4, 5) },
+                ]) {
+                    stTest(instr, out);
+                }
+            }
+            for (const {instr, out} of [
+                { instr: `STZ  2000`,      out: new Word(Plus, 0, 0, 0, 0, 0) },
+                { instr: `STZ  2000(1:5)`, out: new Word(Minus, 0, 0, 0, 0, 0) },
+                { instr: `STZ  2000(5:5)`, out: new Word(Minus, 1, 2, 3, 4, 0) },
+                { instr: `STZ  2000(2:2)`, out: new Word(Minus, 1, 0, 3, 4, 5) },
+                { instr: `STZ  2000(2:3)`, out: new Word(Minus, 1, 0, 0, 4, 5) },
+                { instr: `STZ  2000(0:1)`, out: new Word(Plus, 0, 2, 3, 4, 5) },
+            ]) {
+                stTest(instr, out);
             }
         });
 
