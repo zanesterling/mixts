@@ -1,7 +1,7 @@
-import { describe, expect, test, beforeAll } from "bun:test";
+import { describe, expect, test, beforeAll, beforeEach } from "bun:test";
 
 import {
-    State, Instruction, Word, Index, Byte, Sign, Plus, Minus,
+    State, Instruction, Word, Index, Byte, Sign, Plus, Minus, Comparison,
     padLeft, padRight, leftRot, rightRot,
 } from "./mix";
 
@@ -351,7 +351,103 @@ describe("mix", () => {
             }
         });
 
-        test.todo("Jump");
+        describe("Jump", () => {
+            let state: State;
+            beforeEach(() => {
+                state = new State();
+                state.IP = 2000;
+            });
+
+            test("JMP", () => {
+                state.exec(Instruction.fromText("JMP 3000"));
+                expect(state.IP).toStrictEqual(3000);
+                expect(state.rJ.toNumber()).toStrictEqual(2001);
+            });
+
+            test("JSJ", () => {
+                state.exec(Instruction.fromText("JSJ 3000"));
+                expect(state.IP).toStrictEqual(3000);
+                expect(state.rJ.toNumber()).toStrictEqual(0);
+            });
+
+            test("JOV", () => {
+                state.overflow = false;
+                state.exec(Instruction.fromText("JOV 3000"));
+                expect(state.IP).toStrictEqual(2001);
+                expect(state.rJ.toNumber()).toStrictEqual(0);
+                expect(state.overflow).toStrictEqual(false);
+
+                state.overflow = true;
+                state.exec(Instruction.fromText("JOV 3000"));
+                expect(state.IP).toStrictEqual(3000);
+                expect(state.rJ.toNumber()).toStrictEqual(2002);
+                expect(state.overflow).toStrictEqual(false);
+            });
+
+            test("JNOV", () => {
+                state.overflow = true;
+                state.exec(Instruction.fromText("JNOV 3000"));
+                expect(state.IP).toStrictEqual(2001);
+                expect(state.rJ.toNumber()).toStrictEqual(0);
+                expect(state.overflow).toStrictEqual(false);
+
+                state.overflow = false;
+                state.exec(Instruction.fromText("JNOV 3000"));
+                expect(state.IP).toStrictEqual(3000);
+                expect(state.rJ.toNumber()).toStrictEqual(2002);
+                expect(state.overflow).toStrictEqual(false);
+            });
+        
+            const comps: Comparison[] = ["LESS", "EQUAL", "GREATER"];
+            for (const {op, oks} of [
+                {op: "JL", oks: ["LESS"]},
+                {op: "JE", oks: ["EQUAL"]},
+                {op: "JG", oks: ["GREATER"]},
+                {op: "JGE", oks: ["GREATER", "EQUAL"]},
+                {op: "JNE", oks: ["LESS", "GREATER"]},
+                {op: "JLE", oks: ["LESS", "EQUAL"]},
+            ]) {
+                test(op, () => {
+                    for (const cmp of comps) {
+                        state.comparison = cmp;
+                        state.exec(Instruction.fromText(`${op} 2000`));
+                        if (oks.includes(cmp)) expect(state.IP).toStrictEqual(2000);
+                        else expect(state.IP).not.toStrictEqual(2000);
+                    }
+                });
+            }
+
+            const testVals = [-1, 0, 1];
+            for (const {reg, setReg} of [
+                {reg: "A", setReg: (x: number) => state.rA = Word.fromNumber(x) },
+                {reg: "X", setReg: (x: number) => state.rX = Word.fromNumber(x) },
+                {reg: "1", setReg: (x: number) => state.rI1 = Index.fromNumber(x) },
+                {reg: "2", setReg: (x: number) => state.rI2 = Index.fromNumber(x) },
+                {reg: "3", setReg: (x: number) => state.rI3 = Index.fromNumber(x) },
+                {reg: "4", setReg: (x: number) => state.rI4 = Index.fromNumber(x) },
+                {reg: "5", setReg: (x: number) => state.rI5 = Index.fromNumber(x) },
+                {reg: "6", setReg: (x: number) => state.rI6 = Index.fromNumber(x) },
+            ]) {
+                for (const {instr, oks} of [
+                    {instr: `J${reg}N 2000`, oks: [-1]},
+                    {instr: `J${reg}Z 2000`, oks: [0]},
+                    {instr: `J${reg}P 2000`, oks: [1]},
+                    {instr: `J${reg}NN 2000`, oks: [0, 1]},
+                    {instr: `J${reg}NZ 2000`, oks: [-1, 1]},
+                    {instr: `J${reg}NP 2000`, oks: [-1, 0]},
+                ]) {
+                    for (const val of testVals) {
+                        test(`${instr} [${reg}=${val}]`, () => {
+                            state.IP = 0;
+                            setReg(val);
+                            state.exec(Instruction.fromText(instr));
+                            if (oks.includes(val)) expect(state.IP).toStrictEqual(2000);
+                            else expect(state.IP).not.toStrictEqual(2000);
+                        });
+                    }
+                }
+            }
+        });
 
         test("Shift", () => {
             const state = new State();
