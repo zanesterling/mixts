@@ -322,7 +322,35 @@ describe("mix", () => {
             }
         });
 
-        test.todo("Comparison");
+        describe("CMP*", () => {
+            const state = new State();
+            state.contents[2000] = Word.fromNumber(-1);
+            state.contents[2001] = Word.fromNumber(0);
+            state.contents[2002] = Word.fromNumber(1);
+            state.rA = new Word(Plus, 0, 0, 0, 2, 0);
+            state.rX = new Word(Plus, 0, 0, 0, 2, 0);
+            state.rI1 = new Index(Plus, 2, 0);
+            state.rI2 = new Index(Plus, 2, 0);
+            state.rI3 = new Index(Plus, 2, 0);
+            state.rI4 = new Index(Plus, 2, 0);
+            state.rI5 = new Index(Plus, 2, 0);
+            state.rI6 = new Index(Plus, 2, 0);
+
+            for (const reg of ["A", "X", "1", "2", "3", "4", "5", "6"]) {
+                for (const {instr, out} of [
+                    { instr: `CMP${reg} 2002`, out: "GREATER" },
+                    { instr: `CMP${reg} 2000(5:5)`, out: "LESS" },
+                    { instr: `CMP${reg} 2001(5:5)`, out: "EQUAL" },
+                    { instr: `CMP${reg} 2002(5:5)`, out: "LESS" },
+                ]) {
+                    test(instr, () => {
+                        state.exec(Instruction.fromText(instr));
+                        expect(state.comparison).toStrictEqual(out);
+                    });
+                }
+            }
+        });
+
         test.todo("Jump");
 
         test("Shift", () => {
