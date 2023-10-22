@@ -46,41 +46,50 @@ describe("mix", () => {
             const state = new State();
             state.contents[2000] = new Word(Minus, 1, 16, 3, 5, 4);
 
-            const testCases = [
-                {
-                    assembly: "LDA  2000",
-                    result: new Word(Minus, 1, 16, 3, 5, 4),
-                },
-                {
-                    assembly: "LDA  2000(1:5)",
-                    result: new Word(Plus, 1, 16, 3, 5, 4),
-                },
-                {
-                    assembly: "LDA  2000(3:5)",
-                    result: new Word(Plus, 0, 0, 3, 5, 4),
-                },
-                {
-                    assembly: "LDA  2000(0:3)",
-                    result: new Word(Minus, 0, 0, 1, 16, 3),
-                },
-                {
-                    assembly: "LDA  2000(4:4)",
-                    result: new Word(Plus, 0, 0, 0, 0, 5),
-                },
-                {
-                    assembly: "LDA  2000(0:0)",
-                    result: new Word(Minus, 0, 0, 0, 0, 0),
-                },
-                {
-                    assembly: "LDA  2000(1:1)",
-                    result: new Word(Plus, 0, 0, 0, 0, 1),
-                },
-            ];
-            for (const {assembly, result} of testCases) {
-                test(assembly, () => {
-                    state.exec(Instruction.fromText(assembly));
-                    expect(state.rA).toStrictEqual(result);
+            const ldTest = (
+                reg: ((s: State) => any),
+                instr: string,
+                out: any) => {
+                test(instr, () => {
+                    state.exec(Instruction.fromText(instr));
+                    expect(reg(state)).toStrictEqual(out);
                 });
+            };
+
+            const regs = [
+                { op: "LDA", reg: (state: State) => state.rA },
+                { op: "LDX", reg: (state: State) => state.rX },
+            ];
+            for (const {op, reg} of regs) {
+                let testCases = [
+                    { instr: `${op}  2000`, out: new Word(Minus, 1, 16, 3, 5, 4) },
+                    { instr: `${op}  2000(4:4)`, out: new Word(Plus, 0, 0, 0, 0, 5) },
+                    { instr: `${op}  2000(0:0)`, out: new Word(Minus, 0, 0, 0, 0, 0) },
+                    { instr: `${op}  2000(1:1)`, out: new Word(Plus, 0, 0, 0, 0, 1) },
+                    { instr: `${op}  2000(1:5)`, out: new Word(Plus, 1, 16, 3, 5, 4) },
+                    { instr: `${op}  2000(3:5)`, out: new Word(Plus, 0, 0, 3, 5, 4) },
+                    { instr: `${op}  2000(0:3)`, out: new Word(Minus, 0, 0, 1, 16, 3) },
+                ];
+                for (const {instr, out} of testCases) {
+                    ldTest(reg, instr, out);
+                }
+            }
+
+            for (const {op, reg} of [
+                { op: "LD1", reg: (state: State) => state.rI1 },
+                { op: "LD2", reg: (state: State) => state.rI2 },
+                { op: "LD3", reg: (state: State) => state.rI3 },
+                { op: "LD4", reg: (state: State) => state.rI4 },
+                { op: "LD5", reg: (state: State) => state.rI5 },
+                { op: "LD6", reg: (state: State) => state.rI6 },
+            ]) {
+                for (const {instr, out} of [
+                    { instr: `${op}  2000(4:4)`, out: new Index(Plus, 0, 5) },
+                    { instr: `${op}  2000(0:0)`, out: new Index(Minus, 0, 0) },
+                    { instr: `${op}  2000(1:1)`, out: new Index(Plus, 0, 1) },
+                ]) {
+                    ldTest(reg, instr, out);
+                }
             }
         });
 
@@ -305,7 +314,7 @@ describe("utils", () => {
     });
 });
 
-describe.only("1.3.1", () => {
+describe("1.3.1", () => {
     test("Problem 16", () => {
         // (a) Shortest possible.
         let state = new State();
