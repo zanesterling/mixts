@@ -12,6 +12,8 @@ function compare(a: number, b: number): Comparison {
     return a < b ? "LESS" : a === b ? "EQUAL" : "GREATER";
 }
 
+export const CLOCK_US: number = 8; // One clock cycle is 8 microseconds.
+
 export class Word {
     static MAX = (1 << 30) - 1;
 
@@ -159,6 +161,14 @@ export class State {
     clock: bigint = 0n;
     halt: boolean = false;
     memfault: boolean = false;
+    ios: InputOutput[];
+
+    getDevice(unitNumber: number) {
+        if (unitNumber < 1 || unitNumber > 20) {
+            throw new Error(`no such IO unit: ${unitNumber}`);
+        }
+        return this.ios[unitNumber-1];
+    }
 
     constructor() {
         this.rIs = [Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero, Index.Zero];
@@ -166,6 +176,8 @@ export class State {
         for (let i = 0; i < this.contents.length; i++) {
             this.contents[i] = Word.Zero;
         }
+        this.ios = new Array(20);
+        this.ios[16] = new CardReader();
     }
 
     exec(instr: Instruction) {
@@ -338,6 +350,44 @@ export class State {
 
 
             /* IO Instructions */
+            case 34: { // IN
+                const device = this.getDevice(instr.F);
+                if (!device.canIn()) {
+                    throw new Error(`device ${instr.F} doesn't support IN`);
+                }
+                const op = device.wait();
+                if (op !== null) this.applyOp(op);
+                device.in(M);
+                break;
+            }
+            case 35: { // OUT
+                const device = this.getDevice(instr.F);
+                if (!device.canOut()) {
+                    throw new Error(`device ${instr.F} doesn't support OUT`);
+                }
+                const op = device.wait();
+                if (op !== null) this.applyOp(op);
+                device.out(M, this.contents);
+                break;
+            }
+            case 36: // IOC
+                throw NotImplementedError("IOC");
+                break;
+
+            case 37: { // JRED
+                if (this.getDevice(instr.F).ready()) {
+                    this.IP = M;
+                    this.jumped = true;
+                }
+                break;
+            }
+            case 38: { // JBUS
+                if (!this.getDevice(instr.F).ready()) {
+                    this.IP = M;
+                    this.jumped = true;
+                }
+                break;
+            }
 
 
             /* Jump instructions */
@@ -635,6 +685,19 @@ export class State {
         this.rJ = Index.fromNumber(this.IP + 1);
         this.IP = M;
         this.jumped = true;
+    }
+
+    private applyOp(op: OpIn|OpOut) {
+        if (op instanceof OpIn) {
+            this.clock = op.finishedClock;
+            for (let i = 0; i < op.mem.length; i++) {
+                this.contents[op.addr + i] = op.mem[i];
+            }
+        } else if (op instanceof OpOut) {
+            this.clock = op.finishedClock;
+        } else {
+            throw new Error("unreachable");
+        }
     }
 }
 
@@ -975,6 +1038,10 @@ function NotImplementedError(funcName: string) {
     return new Error(`Function ${funcName} not implemented.`);
 }
 
+function NotSupportedError(funcName: string) {
+    return new Error(`Function ${funcName} not supported.`);
+}
+
 
 function setn<T>(xs: Array<T>, start: number, end: number, ys: Array<T>) {
     for (let i = 0; i < end-start; i++) {
@@ -1024,4 +1091,71 @@ export function rightRot<T>(xs: Array<T>, n: number): Array<T> {
         ret[i] = xs[((i-n) % len + len) % len];
     }
     return ret;
+}
+
+class OpIn {
+    constructor(
+        readonly finishedClock: bigint,
+        readonly addr: number,
+        readonly mem: Array<Word>,
+    ) {}
+}
+class OpOut {
+    constructor(
+        readonly finishedClock: bigint,
+    ) {}
+}
+class OpControl {}
+
+export interface InputOutput {
+    canIn(): boolean;
+    canOut(): boolean;
+
+    ready(): boolean;
+    in(now: bigint, M: number): void;
+    out(now: bigint, M: number, mem: Array<Word>): void;
+    control(M: number): void;
+
+    wait(): OpIn|OpOut|OpControl|null;
+}
+
+type Card = Array<Word>;
+export class CardReader implements InputOutput {
+    // The IBM 1130 could read 300 cards per minute and punch 80 cards
+    // per minute. To read one card then takes 200ms, 200,000us, or
+    // 25,000 clock cycles.
+    // https://artsandculture.google.com/story/punched-card-machines-the-national-museum-of-computing/bwWBrooyeGKPiA?hl=en
+    static READ_TIME_CYCLES: bigint = 25n * 1000n;
+
+    cards: Array<Card>; // Stack of cards.
+    ongoingRead: OpIn|null = null;
+
+    constructor(cards: Array<Card>) {
+        this.cards = cards;
+    }
+
+    ready(): boolean {
+        return this.ongoingRead === null;
+    }
+
+    canIn(): boolean { return true; }
+    in(now: bigint, M: number) {
+        if (this.ongoingRead !== null) { throw new Error("IN in progress"); }
+        const card = this.cards.pop();
+        if (card === undefined) return; // There are no cards in the deck.
+        this.ongoingRead =
+            new OpIn(now+CardReader.READ_TIME_CYCLES, M, card);
+    }
+
+    canOut(): boolean { return false; }
+    out(now: bigint, M: number, mem: Array<Word>) {
+        throw NotSupportedError("CardReader.out()");
+    }
+    control(M: number) { throw NotSupportedError("CardReader.control()"); }
+
+    wait(): OpIn|OpOut|OpControl|null {
+        const ret = this.ongoingRead;
+        this.ongoingRead = null;
+        return ret;
+    }
 }
