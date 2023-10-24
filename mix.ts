@@ -620,6 +620,10 @@ export class State {
         if (op === null) throw new Error("card reader has no card");
         this.applyOp(op);
 
+        // Jump to 0.
+        this.IP = 0;
+        this.rJ = Index.Zero;
+
         while (!this.halt) this.step();
     }
 
