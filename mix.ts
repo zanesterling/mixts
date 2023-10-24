@@ -357,7 +357,7 @@ export class State {
                 }
                 const op = device.wait();
                 if (op !== null) this.applyOp(op);
-                device.in(M);
+                device.in(this.clock, M);
                 break;
             }
             case 35: { // OUT
@@ -367,7 +367,7 @@ export class State {
                 }
                 const op = device.wait();
                 if (op !== null) this.applyOp(op);
-                device.out(M, this.contents);
+                device.out(this.clock, M, this.contents);
                 break;
             }
             case 36: // IOC
@@ -687,7 +687,7 @@ export class State {
         this.jumped = true;
     }
 
-    private applyOp(op: OpIn|OpOut) {
+    private applyOp(op: OpIn|OpOut|OpControl) {
         if (op instanceof OpIn) {
             this.clock = op.finishedClock;
             for (let i = 0; i < op.mem.length; i++) {
@@ -695,6 +695,8 @@ export class State {
             }
         } else if (op instanceof OpOut) {
             this.clock = op.finishedClock;
+        } else if (op instanceof OpControl) {
+            throw NotImplementedError("IOC");
         } else {
             throw new Error("unreachable");
         }
@@ -1127,12 +1129,8 @@ export class CardReader implements InputOutput {
     // https://artsandculture.google.com/story/punched-card-machines-the-national-museum-of-computing/bwWBrooyeGKPiA?hl=en
     static READ_TIME_CYCLES: bigint = 25n * 1000n;
 
-    cards: Array<Card>; // Stack of cards.
+    cards: Array<Card> = []; // Stack of cards.
     ongoingRead: OpIn|null = null;
-
-    constructor(cards: Array<Card>) {
-        this.cards = cards;
-    }
 
     ready(): boolean {
         return this.ongoingRead === null;
