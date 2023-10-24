@@ -177,7 +177,7 @@ export class State {
             this.contents[i] = Word.Zero;
         }
         this.ios = new Array(20);
-        this.ios[16] = new CardReader();
+        this.ios[15] = new CardReader();
     }
 
     exec(instr: Instruction) {
@@ -350,7 +350,17 @@ export class State {
 
 
             /* IO Instructions */
-            case 34: { // IN
+            case 34: { // JBUS
+                if (!this.getDevice(instr.F).ready()) {
+                    this.IP = M;
+                    this.jumped = true;
+                }
+                break;
+            }
+            case 35: // IOC
+                throw NotImplementedError("IOC");
+                break;
+            case 36: { // IN
                 const device = this.getDevice(instr.F);
                 if (!device.canIn()) {
                     throw new Error(`device ${instr.F} doesn't support IN`);
@@ -360,7 +370,7 @@ export class State {
                 device.in(this.clock, M);
                 break;
             }
-            case 35: { // OUT
+            case 37: { // OUT
                 const device = this.getDevice(instr.F);
                 if (!device.canOut()) {
                     throw new Error(`device ${instr.F} doesn't support OUT`);
@@ -370,19 +380,8 @@ export class State {
                 device.out(this.clock, M, this.contents);
                 break;
             }
-            case 36: // IOC
-                throw NotImplementedError("IOC");
-                break;
-
-            case 37: { // JRED
+            case 38: { // JRED
                 if (this.getDevice(instr.F).ready()) {
-                    this.IP = M;
-                    this.jumped = true;
-                }
-                break;
-            }
-            case 38: { // JBUS
-                if (!this.getDevice(instr.F).ready()) {
                     this.IP = M;
                     this.jumped = true;
                 }
@@ -612,9 +611,14 @@ export class State {
     }
 
     go() {
-        // TODO: Implement real GO button.
         this.halt = false;
         this.memfault = false;
+
+        // Load first card in.
+        this.ios[15].in(this.clock, 0);
+        const op = this.ios[15].wait();
+        if (op === null) throw new Error("card reader has no card");
+        this.applyOp(op);
 
         while (!this.halt) this.step();
     }
@@ -1157,3 +1161,29 @@ export class CardReader implements InputOutput {
         return ret;
     }
 }
+
+
+const WORDS_PER_CARD: number = 16;
+
+function punchable(b: number) {
+    return b < 39 && (true /* TODO: ignore pi and sig */);
+}
+
+export function programToRawCards(lines: string[]): Card[] {
+    lines = lines.filter(s => !!s);
+    const cards: Card[] = [];
+    for (let i = 0; i*WORDS_PER_CARD < lines.length; i++) {
+        const words: Word[] = [];
+        for (let j = 0; j < WORDS_PER_CARD; j++) {
+            const ii = i*WORDS_PER_CARD + j;
+            if (ii > lines.length) break;
+            words.push(Instruction.fromText(lines[ii]).toWord());
+        }
+
+        while (words.length < 5) words.push(Word.Zero);
+        cards.push(words);
+    }
+    return cards;
+}
+
+export const loadingProgram: string = await Bun.file('load.mix').text();

@@ -2,7 +2,7 @@ import { describe, expect, test, beforeAll, beforeEach } from "bun:test";
 
 import {
     State, Instruction, Word, Index, Byte, Sign, Plus, Minus, Comparison,
-    padLeft, padRight, leftRot, rightRot,
+    padLeft, padRight, leftRot, rightRot, programToRawCards, loadingProgram, CardReader,
 } from "./mix";
 
 beforeAll(() => {
@@ -558,5 +558,18 @@ describe("1.3.1", () => {
             .toBeTrue();
         expect(state.getmem(100)).toStrictEqual(Word.fromNumber(1));
         expect(state.clock).toStrictEqual(200n);
+    });
+});
+
+describe.only("loading test", () => {
+    test("", () => {
+        const state = new State();
+        const cardReader = state.getDevice(16) as CardReader;
+        for (const card of programToRawCards(loadingProgram.split('\n'))) {
+            cardReader.cards.push(card);
+        }
+        state.go();
+        expect(state.halt).toBeTrue();
+        expect(state.IP).toStrictEqual(16);
     });
 });
