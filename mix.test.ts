@@ -338,10 +338,10 @@ describe("mix", () => {
 
             for (const reg of ["A", "X", "1", "2", "3", "4", "5", "6"]) {
                 for (const {instr, out} of [
-                    { instr: `CMP${reg} 2002`, out: "GREATER" },
-                    { instr: `CMP${reg} 2000(5:5)`, out: "LESS" },
-                    { instr: `CMP${reg} 2001(5:5)`, out: "EQUAL" },
-                    { instr: `CMP${reg} 2002(5:5)`, out: "LESS" },
+                    { instr: `CMP${reg} 2002`,      out: "GREATER" as Comparison },
+                    { instr: `CMP${reg} 2000(5:5)`, out: "LESS"    as Comparison },
+                    { instr: `CMP${reg} 2001(5:5)`, out: "EQUAL"   as Comparison },
+                    { instr: `CMP${reg} 2002(5:5)`, out: "LESS"    as Comparison },
                 ]) {
                     test(instr, () => {
                         state.exec(Instruction.fromText(instr));
