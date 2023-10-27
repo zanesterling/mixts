@@ -562,6 +562,11 @@ describe("1.3.1", () => {
 });
 
 describe("loading test", () => {
+    test("loading routine fits on two cards", () => {
+        const cards = programToRawCards(loadingProgram.split('\n'));
+        expect(cards.length).toBeLessThanOrEqual(2);
+    });
+
     test("can load from card reader", () => {
         const state = new State();
         const cardReader = state.getDevice(16) as CardReader;

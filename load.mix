@@ -1,16 +1,32 @@
 IN 16(2:0)
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-NOP 0
-HLT 0
+
+# Read a card.
+IN 80(2:0)
+JBUS 3
+
+# Prepare for loop.
+LD2 1(1:1)  # rI2 <- number of words in this card
+STZ 1(1:1)
+LD3 1(1:5)  # rI3 <- address to store words to
+J2Z 0,3     # If it's the TRANS card, jump to start.
+STZ 0
+LD4 0       # rI4 <- 0 (index of cur word * 2)
+
+# Get the word's value.
+LDA 2,4
+LDX 3,4
+NUM 0
+
+LDX 3,4(5:5)
+DECX 20
+STA 80
+STX 80(0:0)
+LDA 80
+STA 0,3(1:5)
+
+DEC2 1  # one less word on the card
+INC3 1  # store into next address
+INC4 2  # pull 
+J2NZ 9
+
+JMP 1   # Read next card.

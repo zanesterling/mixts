@@ -1170,7 +1170,7 @@ export class CardReader implements InputOutput {
 const WORDS_PER_CARD: number = 16;
 
 function punchable(b: number) {
-    return b < 39 && (true /* TODO: ignore pi and sig */);
+    return !(b >= 48 || b === 20 || b === 21);
 }
 
 export function programToRawCards(lines: string[]): Card[] {
@@ -1183,14 +1183,24 @@ export function programToRawCards(lines: string[]): Card[] {
         line = match[0];
         if (!line) continue;
 
-        words.push(Instruction.fromText(line).toWord());
-        if (words.length === 16) cards.push(words);
+        const w = Instruction.fromText(line).toWord();
+        if (w.bytes().some(b => !punchable(b))) {
+            throw new Error(
+                `unpunchable byte in line ${i}: "${line}": ${w.bytes()}`);
+        }
+        words.push(w);
+        if (words.length === WORDS_PER_CARD) cards.push(words);
     }
     if (words.length > 0) {
-        while (words.length < 16) words.push(Word.Zero);
+        while (words.length < WORDS_PER_CARD) words.push(Word.Zero);
         cards.push(words);
     }
     return cards;
 }
 
 export const loadingProgram: string = await Bun.file('load.mix').text();
+
+export function punchProgram(filename: string): Card[] {
+    const cards: Card[] = programToRawCards(loadingProgram.split('\n'));
+    return cards;
+}
