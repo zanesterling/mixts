@@ -561,8 +561,8 @@ describe("1.3.1", () => {
     });
 });
 
-describe.only("loading test", () => {
-    test("", () => {
+describe("loading test", () => {
+    test("can load from card reader", () => {
         const state = new State();
         const cardReader = state.getDevice(16) as CardReader;
         for (const card of programToRawCards(loadingProgram.split('\n'))) {
