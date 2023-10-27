@@ -1174,17 +1174,20 @@ function punchable(b: number) {
 }
 
 export function programToRawCards(lines: string[]): Card[] {
-    lines = lines.filter(s => !!s);
     const cards: Card[] = [];
-    for (let i = 0; i*WORDS_PER_CARD < lines.length; i++) {
-        const words: Word[] = [];
-        for (let j = 0; j < WORDS_PER_CARD; j++) {
-            const ii = i*WORDS_PER_CARD + j;
-            if (ii > lines.length) break;
-            words.push(Instruction.fromText(lines[ii]).toWord());
-        }
+    let words: Word[] = [];
+    for (let i=0; i < lines.length; i++) {
+        let line = lines[i];
+        const match = line.match(/[^#]*/);
+        if (match === null) throw new Error(`could not parse line: ${line}`);
+        line = match[0];
+        if (!line) continue;
 
-        while (words.length < 5) words.push(Word.Zero);
+        words.push(Instruction.fromText(line).toWord());
+        if (words.length === 16) cards.push(words);
+    }
+    if (words.length > 0) {
+        while (words.length < 16) words.push(Word.Zero);
         cards.push(words);
     }
     return cards;
